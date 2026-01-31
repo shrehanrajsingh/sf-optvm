@@ -1,0 +1,51 @@
+if 0
+    if 0
+        putln (1)
+    else
+        if 0
+            putln (2)
+        else
+            putln (3)
+else
+    putln (4)
+
+    if 0
+        if 0
+            if 0
+                putln(5)
+            else
+                if 0
+                    if 0
+                        putln(6)
+                    else
+                        if 0
+                            putln(7)
+                        else
+                            putln(8)
+                else
+                    putln(9)
+        else
+            if 0
+                putln(10)
+            else
+                if 1
+                    if 0
+                        putln(11)
+                    else
+                        putln(12)
+                else
+                    putln(13)
+    else
+        if 0
+            putln(14)
+        else
+            if 1
+                if 1
+                    if 0
+                        putln(15)
+                    else
+                        putln(16)
+                else
+                    putln(17)
+            else
+                putln(18)
