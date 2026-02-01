@@ -431,10 +431,13 @@ test3 ()
     vm.globals[vm.gnext_slot++] = put_o;
   }
 
+  vm.fp = 1;
   sf_vm_gen_bytecode (&vm, stt);
   sf_vm_print_b (&vm);
+  vm.fp = 0;
 
   frame_t top = sf_frame_new ();
+  top.return_ip = vm.inst_len - 1;
   sf_vm_addframe (&vm, top);
 
   double start = now_sec ();
@@ -443,9 +446,9 @@ test3 ()
 
   do
     {
-      sf_vm_exec_frame (&vm, 0);
-      // sf_vm_exec_frame (&vm, 0);
-      // sf_vm_exec_frame (&vm, 0);
+      sf_vm_exec_frame (&vm);
+      // sf_vm_exec_frame (&vm);
+      // sf_vm_exec_frame (&vm);
 
       // printf ("%lu\n", c++);
       c++;

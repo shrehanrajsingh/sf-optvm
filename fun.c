@@ -8,6 +8,7 @@ sf_fun_new (int type)
   f->argl = 0;
   f->argc = 4;
   f->args = SFMALLOC (f->argc * sizeof (*f->args));
+  f->name = NULL;
 
   if (f->type == FUN_NATIVE)
     {

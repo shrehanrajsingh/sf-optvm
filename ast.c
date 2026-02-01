@@ -537,6 +537,112 @@ sf_ast_gen (TokenSM *smt)
                 smtv = block_end;
                 res->vals[res->vl++] = st;
               }
+            else if (!strcmp (kw, "fun"))
+              {
+                size_t tb = get_tbsp (smtv, smt->vals);
+                token_t tok_name = *smtv++;
+                assert (tok_name.type == TOK_IDENTIFIER);
+
+                const char *name = tok_name.v.t_identifier.value;
+
+                token_t *x = ++smtv; /* first arg, after '(' */
+                token_t *y = x;
+
+                expr_t **args = SFMALLOC (8 * sizeof (*args));
+                size_t ac = 8;
+                size_t al = 0;
+
+                int gb = 0;
+
+                while (y->type != TOK_EOF)
+                  {
+                    if (y->type == TOK_OPERATOR)
+                      {
+                        const char *op = y->v.t_operator.value;
+
+                        if (*op == ')' && !gb)
+                          {
+                            if (y == x)
+                              {
+                                /* no args */
+                              }
+                            else
+                              {
+                                if (al >= ac)
+                                  {
+                                    ac += 8;
+                                    args = SFREALLOC (args,
+                                                      ac * sizeof (*args));
+                                  }
+
+                                args[al++] = sf_expr_gen (x, y);
+                              }
+
+                            break;
+                          }
+
+                        if (*op == ',' && !gb)
+                          {
+                            if (al >= ac)
+                              {
+                                ac += 8;
+                                args = SFREALLOC (args, ac * sizeof (*args));
+                              }
+
+                            args[al++] = sf_expr_gen (x, y);
+                            x = ++smtv;
+                          }
+
+                        if (strstr ("({[", op) != NULL)
+                          gb++;
+
+                        if (strstr (")}]", op) != NULL)
+                          gb--;
+                      }
+
+                    y = ++smtv;
+                  }
+
+                token_t *block_end = get_block (++smtv, tb);
+
+                TokenSM tsmt;
+                tsmt.vals = smtv;
+                tsmt.vl = block_end - smtv;
+
+                // for (int i = 0; i < tsmt.vl; i++)
+                //   sf_token_print (tsmt.vals[i]);
+
+                // printf ("--------------\n");
+
+                block_end++;
+                token_t bep = *block_end;
+                block_end->type = TOK_EOF;
+
+                StmtSM *body_smt = sf_ast_gen (&tsmt);
+                *block_end = bep;
+
+                while (block_end->type != TOK_EOF)
+                  {
+                    if (block_end->type == TOK_NEWLINE
+                        || block_end->type == TOK_SPACE)
+                      ;
+                    else
+                      break;
+
+                    block_end++;
+                  }
+
+                stmt_t st;
+                st.type = STMT_FUNDECL;
+                st.v.s_fundecl.argc = al;
+                st.v.s_fundecl.args = args;
+                st.v.s_fundecl.body = body_smt->vals;
+                st.v.s_fundecl.bl = body_smt->vl;
+                st.v.s_fundecl.name = name;
+
+                smtv = block_end;
+                res->vals[res->vl++] = st;
+              }
           }
           break;
 

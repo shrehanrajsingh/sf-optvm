@@ -60,6 +60,23 @@ sf_stmt_print (stmt_t s)
       }
       break;
 
+    case STMT_FUNDECL:
+      {
+        printf ("FUN_DECL: name '%s'\n", s.v.s_fundecl.name);
+
+        printf ("args: (%lu)\n", s.v.s_fundecl.argc);
+        for (int i = 0; i < s.v.s_fundecl.argc; i++)
+          {
+            sf_expr_print (*s.v.s_fundecl.args[i]);
+            putchar ('\n');
+          }
+
+        printf ("body: (%lu)\n", s.v.s_fundecl.bl);
+        for (int i = 0; i < s.v.s_fundecl.bl; i++)
+          sf_stmt_print (s.v.s_fundecl.body[i]);
+      }
+      break;
+
     case STMT_EOF:
       {
         printf ("STMT_EOF\n");

@@ -11,6 +11,7 @@ enum StmtType
   STMT_FUNCALL,
   STMT_IFBLOCK,
   STMT_WHILE,
+  STMT_FUNDECL,
   STMT_EOF
 };
 
@@ -53,6 +54,17 @@ typedef struct __stmt_s
       size_t bl;
 
     } s_while;
+
+    struct
+    {
+      const char *name;
+      expr_t **args;
+      size_t argc;
+
+      struct __stmt_s *body;
+      size_t bl;
+
+    } s_fundecl;
 
   } v;
 

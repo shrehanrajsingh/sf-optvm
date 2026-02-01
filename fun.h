@@ -51,7 +51,7 @@ typedef struct
 
     struct
     {
-      int i;
+      size_t lp;
 
     } coded;
 

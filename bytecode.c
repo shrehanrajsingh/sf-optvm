@@ -133,11 +133,38 @@ add_var_global (vm_t *vm, const char *var)
     }
 
   size_t gn = vm->gnext_slot;
-  size_t *ggn = SFMALLOC (sizeof (*ggn));
-  *ggn = gn;
+  vval_t *ggn = SFMALLOC (sizeof (*ggn));
+  ggn->pos = gn;
+  ggn->slot = SF_VM_SLOT_GLOBAL;
 
   sf_ht_insert (vm->ht, var, (void *)ggn);
   vm->gnext_slot++;
+
+  return gn;
+}
+
+size_t
+add_var_local (vm_t *vm, const char *var)
+{
+  frame_t *fr = &vm->frames[vm->fp - 1];
+
+  if (fr->locals_count >= fr->locals_cap)
+    {
+      fr->locals_cap += SF_VM_GLOBALS_CAP;
+      fr->locals
+          = SFREALLOC (fr->locals, fr->locals_cap * sizeof (*fr->locals));
+
+      for (int i = 0; i < fr->locals_cap; i++)
+        fr->locals[i] = NULL;
+    }
+
+  size_t gn = fr->locals_count;
+  vval_t *ggn = SFMALLOC (sizeof (*ggn));
+  ggn->pos = gn;
+  ggn->slot = SF_VM_SLOT_LOCAL;
+
+  sf_ht_insert (vm->ht, var, (void *)ggn);
+  fr->locals_count++;
 
   return gn;
 }
@@ -174,12 +201,16 @@ sf_vm_new ()
 SF_API void
 sf_vm_gen_b_fromexpr (vm_t *vm, expr_t e)
 {
+  int is_global = vm->fp == 1;
+  int slot = is_global ? SF_VM_SLOT_GLOBAL : SF_VM_SLOT_LOCAL;
+  //   D (printf ("%d\n", vm->fp));
+
   switch (e.type)
     {
     case EXPR_VAR:
       {
         int gr = 0;
-        void *v = sf_ht_get (vm->ht, e.v.e_var.v, &gr);
+        vval_t *v = sf_ht_get (vm->ht, e.v.e_var.v, &gr);
         size_t vs;
 
         if (!gr)
@@ -188,12 +219,12 @@ sf_vm_gen_b_fromexpr (vm_t *vm, expr_t e)
             exit (1);
           }
         else
-          vs = *(size_t *)v;
+          vs = v->pos;
 
         add_inst (vm, (instr_t){
                           .op = OP_LOAD_VAR,
                           .a = (int)vs,
-                          .b = 0,
+                          .b = v->slot,
                       });
       }
       break;
@@ -298,6 +329,8 @@ SF_API void
 sf_vm_gen_bytecode (vm_t *vm, StmtSM *smt)
 {
   stmt_t st = *smt->vals++;
+  int is_global = vm->fp < 2;
+  int slot = is_global ? SF_VM_SLOT_GLOBAL : SF_VM_SLOT_LOCAL;
 
   while (st.type != STMT_EOF)
     {
@@ -307,25 +340,34 @@ sf_vm_gen_bytecode (vm_t *vm, StmtSM *smt)
           {
             sf_vm_gen_b_fromexpr (vm, *st.v.s_vardecl.val);
 
+            size_t vs;
+            int sl = slot;
             if (st.v.s_vardecl.name->type == EXPR_VAR)
               {
                 int gr = 0;
                 const char *vname = st.v.s_vardecl.name->v.e_var.v;
-                void *v = sf_ht_get (vm->ht, vname, &gr);
-                size_t vs;
+                vval_t *v = sf_ht_get (vm->ht, vname, &gr);
 
                 if (!gr)
-                  /* vs =  */ add_var_global (vm, vname);
-                // else
-                //   vs = *(size_t *)v;
+                  {
+                    if (is_global)
+                      vs = add_var_global (vm, vname);
+                    else
+                      vs = add_var_local (vm, vname);
+                  }
+                else
+                  {
+                    vs = v->pos;
+                    sl = v->slot;
+                  }
               }
-
-            sf_vm_gen_b_fromexpr (vm, *st.v.s_vardecl.name);
+            else
+              assert (0 && "TODO");
 
             add_inst (vm, (instr_t){
                               .op = OP_STORE,
-                              .a = 0,
-                              .b = 0,
+                              .a = vs,
+                              .b = sl,
                           });
           }
           break;
@@ -434,6 +476,88 @@ sf_vm_gen_bytecode (vm_t *vm, StmtSM *smt)
           }
           break;
 
+        case STMT_FUNDECL:
+          {
+            add_inst (vm, (instr_t){
+                              .op = OP_JUMP,
+                              .a = 0,
+                              .b = 0,
+                          });
+
+            size_t vll = vm->inst_len;
+            instr_t *lj1 = &vm->insts[vm->inst_len - 1];
+
+            stmt_t *body = st.v.s_fundecl.body;
+            size_t bl = st.v.s_fundecl.bl;
+
+            expr_t **args = st.v.s_fundecl.args;
+            size_t al = st.v.s_fundecl.argc;
+
+            const char *name = st.v.s_fundecl.name;
+
+            fun_t *f = sf_fun_new (FUN_CODED);
+            f->name = (char *)name;
+
+            for (int i = 0; i < al; i++)
+              {
+                switch (args[i]->type)
+                  {
+                  case EXPR_VAR:
+                    sf_fun_addarg (f, (char *)args[i]->v.e_var.v);
+                    break;
+
+                  default:
+                    break;
+                  }
+              }
+
+            size_t pos;
+            obj_t *tar;
+
+            pos = add_var_global (vm, name);
+            tar = vm->globals[pos];
+
+            if (tar == NULL)
+              {
+                vm->globals[pos] = sf_objstore_req ();
+                tar = vm->globals[pos];
+              }
+
+            tar->type = OBJ_FUNC;
+            tar->v.o_fun.v = f;
+
+            for (int i = 0; i < f->argl; i++)
+              {
+                add_inst (vm, (instr_t){
+                                  .op = OP_STORE,
+                                  .a = add_var_local (vm, f->args[i]),
+                                  .b = SF_VM_SLOT_LOCAL,
+                              });
+              }
+
+            frame_t fr = sf_frame_new ();
+            sf_vm_addframe (vm, fr);
+
+            sf_vm_gen_bytecode (vm, (StmtSM *)(StmtSM[]){ (StmtSM){
+                                        .vals = body,
+                                        .vl = bl,
+                                        .vc = bl,
+                                    } });
+
+            add_inst (vm, (instr_t){
+                              .op = OP_STORE,
+                              .a = pos,
+                              .b = slot,
+                          });
+
+            sf_vm_framefree (vm->frames--);
+            vm->fp--;
+
+            lj1->a = vm->inst_len;
+            f->v.coded.lp = vll;
+          }
+          break;
+
         default:
           break;
         }
@@ -492,6 +616,12 @@ sf_vm_print_inst (instr_t i)
     case OP_JUMP_IF_FALSE:
       fputs ("OP_JUMP_IF_FALSE:", stdout);
       break;
+    // case OP_STACK_POP:
+    //   fputs ("OP_STACK_POP:", stdout);
+    //   break;
+    // case OP_STACK_PUSH:
+    //   fputs ("OP_STACK_PUSH:", stdout);
+    //   break;
     default:
       fputs ("UNKNOWN:", stdout);
       break;
@@ -537,11 +667,12 @@ pop (vm_t *vm)
 // #define pop(VM) (VM)->stack[--(VM)->sp]
 
 SF_API void
-sf_vm_exec_frame (vm_t *vm, size_t f_idx)
+sf_vm_exec_frame (vm_t *vm)
 {
   instr_t *insts = vm->insts;
-  frame_t *frame = &vm->frames[f_idx];
+  frame_t *frame = vm->frames;
 
+start:;
   instr_t i = insts[vm->ip];
 
   while (1)
@@ -571,7 +702,7 @@ sf_vm_exec_frame (vm_t *vm, size_t f_idx)
 
         case OP_LOAD_VAR:
           {
-            if (i.b == 0) /* global */
+            if (i.b == SF_VM_SLOT_GLOBAL) /* global */
               {
                 obj_t *vg = vm->globals[i.a];
 
@@ -582,7 +713,7 @@ sf_vm_exec_frame (vm_t *vm, size_t f_idx)
 
                 push (vm, vg);
               }
-            else
+            else if (i.b == SF_VM_SLOT_LOCAL)
               {
                 obj_t *vg = frame->locals[i.a];
 
@@ -602,24 +733,32 @@ sf_vm_exec_frame (vm_t *vm, size_t f_idx)
              * the place to store should always be
              * at the top of the stack
              */
-            obj_t *dest = pop (vm);
             obj_t *val = pop (vm);
 
-            IR (val);
-
-            // sf_obj_print (*dest);
             // sf_obj_print (*val);
 
-            if (dest != NULL)
+            switch (i.b)
               {
-                // D (sf_obj_print (*dest));
-                DR (dest);
-                *dest = *val;
-              }
-            else
-              {
-                printf ("error: unknown location\n");
-                exit (1);
+              case SF_VM_SLOT_GLOBAL:
+                {
+                  if (vm->globals[i.a] != NULL)
+                    DR (vm->globals[i.a]);
+
+                  vm->globals[i.a] = val;
+                }
+                break;
+
+              case SF_VM_SLOT_LOCAL:
+                {
+                  if (frame->locals[i.a] != NULL)
+                    DR (frame->locals[i.a]);
+
+                  frame->locals[i.a] = val;
+                }
+                break;
+
+              default:
+                break;
               }
           }
           break;
@@ -779,7 +918,9 @@ sf_vm_exec_frame (vm_t *vm, size_t f_idx)
             obj_t *args[64];
 
             for (int i = 0; i < argc; i++)
-              args[argc - i - 1] = pop (vm);
+              {
+                args[argc - i - 1] = pop (vm);
+              }
 
             switch (name->type)
               {
@@ -804,9 +945,44 @@ sf_vm_exec_frame (vm_t *vm, size_t f_idx)
                             }
                             break;
 
+                          case NF_ARG_2:
+                            {
+                              obj_t *r
+                                  = f->v.native.v.f_twoarg (args[0], args[1]);
+
+                              if (r != NULL)
+                                DR (r);
+                            }
+                            break;
+
+                          case NF_ARG_3:
+                            {
+                              obj_t *r = f->v.native.v.f_threearg (
+                                  args[0], args[1], args[2]);
+
+                              if (r != NULL)
+                                DR (r);
+                            }
+                            break;
+
                           default:
                             break;
                           }
+                      }
+                      break;
+
+                    case FUN_CODED:
+                      {
+                        for (int i = 0; i < argc; i++)
+                          push (vm, args[i]);
+
+                        frame_t fr = sf_frame_new ();
+                        fr.return_ip = vm->ip + 1;
+                        fr.stack_base = vm->sp;
+
+                        sf_vm_addframe (vm, fr);
+                        vm->ip = f->v.coded.lp - 1;
+                        frame++;
                       }
                       break;
 
@@ -849,7 +1025,15 @@ sf_vm_exec_frame (vm_t *vm, size_t f_idx)
 
 end:;
 
-  vm->ip = frame->return_ip;
+  if (vm->fp > 0)
+    {
+      vm->ip = frame->return_ip;
+      vm->sp = frame->stack_base;
+      vm->fp--;
+
+      sf_vm_framefree (frame--);
+      goto start;
+    }
 }
 
 SF_API frame_t
@@ -876,4 +1060,14 @@ sf_vm_addframe (vm_t *vm, frame_t f)
     }
 
   vm->frames[vm->fp++] = f;
+}
+
+SF_API void
+sf_vm_framefree (frame_t *f)
+{
+  for (int i = 0; i < f->locals_count; i++)
+    if (f->locals[i] != NULL)
+      DR (f->locals[i]);
+
+  SFFREE (f->locals);
 }

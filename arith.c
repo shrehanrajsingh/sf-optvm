@@ -200,6 +200,25 @@ sf_arith_eval_consttree (arith_node_t *n, size_t ns)
                   }
                   break;
 
+                case CONST_STRING:
+                  {
+                    assert (lc->type == rc->type);
+
+                    res.type = EXPR_CONST;
+                    size_t lsl = strlen (lc->v.c_str.v);
+                    size_t rsl = strlen (rc->v.c_str.v);
+
+                    char *rs = SFMALLOC ((lsl + rsl + 1) * sizeof (char));
+
+                    strcpy (rs, lc->v.c_str.v);
+                    lc->v.c_str.v[lsl] = '\0';
+                    strcat (rs, rc->v.c_str.v);
+
+                    res.v.e_const.v.type = CONST_STRING;
+                    res.v.e_const.v.v.c_str.v = rs;
+                  }
+                  break;
+
                 default:
                   break;
                 }
