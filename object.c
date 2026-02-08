@@ -216,3 +216,50 @@ sf_obj_print (obj_t o)
 
   putchar ('\n');
 }
+
+SF_API int
+sf_obj_isfalse (obj_t o)
+{
+  int r = 1;
+  switch (o.type)
+    {
+    case OBJ_CONST:
+      {
+        switch (o.v.o_const.v.type)
+          {
+          case CONST_INT:
+            r = o.v.o_const.v.v.c_int.v == 0;
+            break;
+
+          case CONST_BOOL:
+            r = o.v.o_const.v.v.c_bool.v;
+            break;
+
+          case CONST_FLOAT:
+            r = o.v.o_const.v.v.c_float.v == 0.0f;
+            break;
+
+          case CONST_NONE:
+            r = 1;
+            break;
+
+          case CONST_STRING:
+            r = o.v.o_const.v.v.c_str.v[0] == '\0';
+            break;
+
+          default:
+            break;
+          }
+      }
+      break;
+
+    case OBJ_FUNC:
+      r = 0;
+      break;
+
+    default:
+      break;
+    }
+
+  return r;
+}

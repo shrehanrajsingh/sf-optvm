@@ -3,6 +3,7 @@
 
 #include "ast.h"
 #include "bytecode.h"
+#include "codegen.h"
 #include "const.h"
 #include "expr.h"
 #include "header.h"

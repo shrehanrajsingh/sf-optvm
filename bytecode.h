@@ -13,7 +13,7 @@ typedef enum OpcodeType
 {
   OP_LOAD_CONST,
   OP_LOAD_FAST, /* local var */
-  OP_LOAD_VAR,
+  OP_LOAD,
   OP_STORE,
   OP_CALL,
   OP_ADD_1,
@@ -73,7 +73,6 @@ typedef struct _vm_s
 
   obj_t **globals; /* var name -> slot; globals[slot] = var_value */
   size_t globals_cap;
-  size_t gnext_slot; /* next global slot */
 
   obj_t **stack;
   size_t stack_cap;
@@ -82,6 +81,13 @@ typedef struct _vm_s
   frame_t *frames;
   size_t fp;
   size_t frame_cap;
+
+  struct
+  {
+    int slot;      /* GLOBAL/LOCAL */
+    size_t g_slot; /* global slot count */
+    size_t l_slot; /* local slot count */
+  } meta;
 
 } vm_t;
 
@@ -98,15 +104,14 @@ extern "C"
 #endif // __cplusplus
 
   SF_API vm_t sf_vm_new ();
-  SF_API void sf_vm_gen_b_fromexpr (vm_t *, expr_t);
-  SF_API void sf_vm_gen_bytecode (vm_t *, StmtSM *);
   SF_API void sf_vm_print_inst (instr_t);
   SF_API void sf_vm_print_b (vm_t *);
 
-  SF_API void sf_vm_exec_frame (vm_t *);
+  SF_API void sf_vm_exec_frame_top (vm_t *);
   SF_API frame_t sf_frame_new ();
   SF_API void sf_vm_addframe (vm_t *, frame_t);
   SF_API void sf_vm_framefree (frame_t *);
+  SF_API void sf_vm_popframe (vm_t *);
 
 #if defined(__cplusplus)
 }

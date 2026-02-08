@@ -25,5 +25,6 @@ add_library(sunflower
     ast.h ast.c
     arith.h arith.c
     bytecode.h bytecode.c
+    codegen.h codegen.c
     sunflower.h sunflower.c)
 

@@ -22,6 +22,9 @@ sf_expr_print (expr_t e)
         case CONST_BOOL:
           printf ("BOOL: %s", e.v.e_const.v.v.c_bool.v ? "true" : "false");
           break;
+        case CONST_NONE:
+          printf ("none");
+          break;
         default:
           printf ("<const?>");
           break;

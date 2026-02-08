@@ -407,9 +407,9 @@ test3 ()
     IR (putln_o);
 
     size_t *s = SFMALLOC (sizeof (*s));
-    *s = vm.gnext_slot;
+    *s = vm.meta.g_slot;
     sf_ht_insert (vm.ht, "putln", (void *)s);
-    vm.globals[vm.gnext_slot++] = putln_o;
+    vm.globals[vm.meta.g_slot++] = putln_o;
   }
 
   {
@@ -426,9 +426,9 @@ test3 ()
     IR (put_o);
 
     size_t *s = SFMALLOC (sizeof (*s));
-    *s = vm.gnext_slot;
+    *s = vm.meta.g_slot;
     sf_ht_insert (vm.ht, "put", (void *)s);
-    vm.globals[vm.gnext_slot++] = put_o;
+    vm.globals[vm.meta.g_slot++] = put_o;
   }
 
   vm.fp = 1;
@@ -446,7 +446,7 @@ test3 ()
 
   do
     {
-      sf_vm_exec_frame (&vm);
+      sf_vm_exec_frame_top (&vm);
       // sf_vm_exec_frame (&vm);
       // sf_vm_exec_frame (&vm);
 

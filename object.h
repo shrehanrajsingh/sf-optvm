@@ -69,6 +69,8 @@ extern "C"
   SF_API void sf_obj_print (obj_t);
   SF_API obj_t **sf_get_objstore ();
 
+  SF_API int sf_obj_isfalse (obj_t);
+
 #if defined(__cplusplus)
 }
 #endif // __cplusplus
