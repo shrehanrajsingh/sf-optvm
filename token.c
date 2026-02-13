@@ -71,6 +71,8 @@ makeop (char *op)
             if (op[2] != '=')
               op[2] = '\0';
           }
+        else
+          op[1] = '\0';
       }
       break;
 

@@ -1004,9 +1004,37 @@ sf_expr_gen (token_t *start, token_t *end)
                 if (*op == '=')
                   {
                     re.v.e_cmp.type = CMP_EQEQ;
-                    re.v.e_cmp.right = sf_expr_gen (start, end);
+                  }
+                else if (*op == '<')
+                  {
+                    re.v.e_cmp.type = CMP_LEQ;
+                  }
+                else if (*op == '>')
+                  {
+                    re.v.e_cmp.type = CMP_GEQ;
                   }
 
+                re.v.e_cmp.right = sf_expr_gen (start, end);
+                e = re;
+                goto end;
+              }
+            else if (*op == '<' || *op == '>')
+              {
+                expr_t re;
+                re.type = EXPR_CMP;
+                re.v.e_cmp.left = SFMALLOC (sizeof (*re.v.e_cmp.left));
+                *re.v.e_cmp.left = e;
+
+                if (*op == '<')
+                  {
+                    re.v.e_cmp.type = CMP_LE;
+                  }
+                else
+                  {
+                    re.v.e_cmp.type = CMP_GE;
+                  }
+
+                re.v.e_cmp.right = sf_expr_gen (start, end);
                 e = re;
                 goto end;
               }
