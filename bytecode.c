@@ -625,8 +625,8 @@ start:;
 
         case OP_CMP:
           {
-            obj_t *l = pop (vm);
             obj_t *r = pop (vm);
+            obj_t *l = pop (vm);
 
             // IR (l);
             // IR (r);

@@ -1,2 +1,2 @@
 a = 5
-putln (a != 6)
+putln (a > 1)

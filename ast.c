@@ -1005,6 +1005,10 @@ sf_expr_gen (token_t *start, token_t *end)
                   {
                     re.v.e_cmp.type = CMP_EQEQ;
                   }
+                else if (*op == '!')
+                  {
+                    re.v.e_cmp.type = CMP_NEQ;
+                  }
                 else if (*op == '<')
                   {
                     re.v.e_cmp.type = CMP_LEQ;
