@@ -1,3 +1,10 @@
-fun test (a, b)
-    putln (a)
-    putln (b)
+fun f (a)
+    fun fact (b)
+        if b == 1
+            return b
+        
+        return b * fact (b - 1)
+    return fact (a)
+
+b = f (1)
+putln (b)

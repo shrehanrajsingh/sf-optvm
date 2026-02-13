@@ -1,5 +1,7 @@
 #include "bytecode.h"
 
+static const_t __sf_none_obj = (const_t){ .type = CONST_NONE };
+
 SF_API vm_t
 sf_vm_new ()
 {
@@ -7,7 +9,10 @@ sf_vm_new ()
 
   v.globals_cap = SF_VM_GLOBALS_CAP;
   v.globals = SFMALLOC (v.globals_cap * sizeof (*v.globals));
-  v.ht = sf_ht_new ();
+  v.htc = SF_VM_HT_CAP;
+  v.htl = 0;
+  v.hts = SFMALLOC (v.htc * sizeof (*v.hts));
+  v.hts[v.htl++] = sf_ht_new ();
   v.inst_cap = 64;
   v.inst_len = 0;
   v.insts = SFMALLOC (v.inst_cap * sizeof (*v.insts));
@@ -48,6 +53,9 @@ sf_vm_print_inst (instr_t i)
     case OP_STORE:
       fputs ("OP_STORE:", stdout);
       break;
+    case OP_STORE_FAST:
+      fputs ("OP_STORE_FAST:", stdout);
+      break;
     case OP_RETURN:
       fputs ("OP_RETURN:", stdout);
       break;
@@ -74,6 +82,12 @@ sf_vm_print_inst (instr_t i)
       break;
     case OP_JUMP_IF_FALSE:
       fputs ("OP_JUMP_IF_FALSE:", stdout);
+      break;
+    case OP_LOAD_FUNC_CODED:
+      fputs ("OP_LOAD_FUNC_CODED:", stdout);
+      break;
+    case OP_CMP:
+      fputs ("OP_CMP:", stdout);
       break;
     // case OP_STACK_POP:
     //   fputs ("OP_STACK_POP:", stdout);
@@ -116,7 +130,8 @@ pop (vm_t *vm)
 {
   if (!vm->sp)
     {
-      printf ("error: popping from empty stack\n");
+      D (printf ("vm_ip: %lu\n", vm->ip));
+      D (printf ("error: popping from empty stack\n"));
       exit (1);
     }
 
@@ -136,12 +151,28 @@ sf_vm_exec_frame_top (vm_t *vm)
           = SFREALLOC (vm->globals, vm->globals_cap * sizeof (*vm->globals));
     }
 
+start:;
   while (1)
     {
+      // D (printf ("%lu", vm->ip));
+
       switch (i.op)
         {
         case OP_RETURN:
-          goto end;
+          {
+            obj_t *o = NULL;
+            if (i.a == 1)
+              {
+                /* user wrote a return statement */
+              }
+            else
+              push (vm, o = sf_objstore_req_forconst (&__sf_none_obj));
+
+            if (o != NULL)
+              IR (o);
+
+            goto end;
+          }
           break;
 
         case OP_LOAD_CONST:
@@ -157,6 +188,7 @@ sf_vm_exec_frame_top (vm_t *vm)
                 d_obj->v.o_const.v = d;
               }
 
+            IR (d_obj);
             push (vm, d_obj);
           }
           break;
@@ -167,6 +199,8 @@ sf_vm_exec_frame_top (vm_t *vm)
 
             if (sf_obj_isfalse (*p))
               vm->ip = i.a - 1;
+
+            DR (p);
           }
           break;
 
@@ -179,34 +213,91 @@ sf_vm_exec_frame_top (vm_t *vm)
         case OP_STORE:
           {
             obj_t *val = pop (vm);
-            IR (val);
+            // IR (val);
 
-            switch (i.b)
+            if (vm->globals[i.a] != NULL)
+              DR (vm->globals[i.a]);
+            vm->globals[i.a] = val;
+
+            // push (vm, val);
+          }
+          break;
+
+        case OP_STORE_FAST:
+          {
+            obj_t *val = pop (vm);
+            // IR (val);
+
+            if (i.a >= fr->locals_cap)
               {
-              case SF_VM_SLOT_GLOBAL:
-                {
-                  if (vm->globals[i.a] != NULL)
-                    DR (vm->globals[i.a]);
+                fr->locals_cap += SF_FRAME_LOCALS_CAP;
 
-                  vm->globals[i.a] = val;
-                }
-                break;
-
-              case SF_VM_SLOT_LOCAL:
-                {
-                  fr->locals[i.a] = val;
-                }
-                break;
-
-              default:
-                break;
+                fr->locals = SFREALLOC (fr->locals,
+                                        fr->locals_cap * sizeof (*fr->locals));
               }
+
+            if (i.a >= fr->locals_count)
+              fr->locals_count = i.a + 1;
+
+            if (fr->locals[i.a] != NULL)
+              DR (fr->locals[i.a]);
+            fr->locals[i.a] = val;
+
+            // push (vm, val);
           }
           break;
 
         case OP_LOAD:
           {
-            push (vm, vm->globals[i.a]);
+            obj_t *o = NULL;
+            push (vm, o = vm->globals[i.a]);
+
+            if (o != NULL)
+              IR (o);
+          }
+          break;
+
+        case OP_LOAD_FAST:
+          {
+            obj_t *o = NULL;
+
+            if (i.a >= fr->locals_cap)
+              {
+                fr->locals_cap += SF_FRAME_LOCALS_CAP;
+
+                fr->locals = SFREALLOC (fr->locals,
+                                        fr->locals_cap * sizeof (*fr->locals));
+              }
+
+            if (i.a >= fr->locals_count)
+              fr->locals_count = i.a + 1;
+
+            if (i.b == 0)
+              push (vm, o = fr->locals[i.a]);
+            else
+              {
+                /* number of levels to go up is less than number of frames */
+                assert (i.b < vm->fp);
+
+                push (vm, o = vm->frames[i.b].locals[i.a]);
+              }
+
+            if (o != NULL)
+              IR (o);
+          }
+          break;
+
+        case OP_LOAD_FUNC_CODED:
+          {
+            obj_t *o = sf_objstore_req ();
+            o->type = OBJ_FUNC;
+            o->v.o_fun.v = SFMALLOC (sizeof (fun_t));
+            o->v.o_fun.v->type = FUN_CODED;
+            o->v.o_fun.v->v.coded.lp = i.a;
+            o->v.o_fun.v->argc = o->v.o_fun.v->argl = i.b;
+
+            IR (o);
+            push (vm, o);
           }
           break;
 
@@ -215,11 +306,16 @@ sf_vm_exec_frame_top (vm_t *vm)
             size_t argc = i.a;
             obj_t *name = pop (vm);
 
+            // IR (name);
+
             obj_t *args[64];
             size_t al = 0;
 
             while (al < argc)
-              args[argc - al++ - 1] = pop (vm);
+              {
+                args[al++] = pop (vm);
+                // IR (args[al++]);
+              }
 
             switch (name->type)
               {
@@ -239,7 +335,26 @@ sf_vm_exec_frame_top (vm_t *vm)
                               obj_t *r = f->v.native.v.f_onearg (args[0]);
 
                               if (r != NULL)
-                                DR (r);
+                                {
+                                  if (i.b != 1)
+                                    {
+                                      DR (r);
+                                    }
+                                  else
+                                    {
+                                      push (vm, r);
+                                    }
+                                }
+                              else
+                                {
+                                  if (i.b == 1)
+                                    {
+                                      obj_t *o = sf_objstore_req_forconst (
+                                          &__sf_none_obj);
+
+                                      push (vm, o);
+                                    }
+                                }
                             }
                             break;
 
@@ -249,7 +364,24 @@ sf_vm_exec_frame_top (vm_t *vm)
                                   = f->v.native.v.f_twoarg (args[0], args[1]);
 
                               if (r != NULL)
-                                DR (r);
+                                {
+                                  if (i.b != 1)
+                                    {
+                                      DR (r);
+                                    }
+                                  else
+                                    {
+                                      push (vm, r);
+                                    }
+                                }
+                              else
+                                {
+                                  if (i.b == 1)
+                                    {
+                                      obj_t *o = sf_objstore_req_forconst (
+                                          &__sf_none_obj);
+                                    }
+                                }
                             }
                             break;
 
@@ -259,7 +391,24 @@ sf_vm_exec_frame_top (vm_t *vm)
                                   args[0], args[1], args[2]);
 
                               if (r != NULL)
-                                DR (r);
+                                {
+                                  if (i.b != 1)
+                                    {
+                                      DR (r);
+                                    }
+                                  else
+                                    {
+                                      push (vm, r);
+                                    }
+                                }
+                              else
+                                {
+                                  if (i.b == 1)
+                                    {
+                                      obj_t *o = sf_objstore_req_forconst (
+                                          &__sf_none_obj);
+                                    }
+                                }
                             }
                             break;
 
@@ -268,18 +417,60 @@ sf_vm_exec_frame_top (vm_t *vm)
                               obj_t *r = f->v.native.v.f_anyarg (args, al);
 
                               if (r != NULL)
-                                DR (r);
+                                {
+                                  if (i.b != 1)
+                                    {
+                                      DR (r);
+                                    }
+                                  else
+                                    {
+                                      push (vm, r);
+                                    }
+                                }
+                              else
+                                {
+                                  if (i.b == 1)
+                                    {
+                                      obj_t *o = sf_objstore_req_forconst (
+                                          &__sf_none_obj);
+                                    }
+                                }
                             }
                             break;
 
                           default:
                             break;
                           }
+
+                        for (size_t i = 0; i < al; i++)
+                          DR (args[i]);
                       }
                       break;
 
                     case FUN_CODED:
                       {
+                        size_t lp = f->v.coded.lp;
+
+                        for (size_t i = 0; i < al; i++)
+                          {
+                            push (vm, args[i]);
+                            // IR (args[i]);
+                          }
+
+                        frame_t frt = sf_frame_new ();
+                        frt.return_ip = vm->ip + 1;
+                        // D (printf ("%d\n", fr.return_ip));
+                        frt.stack_base = vm->sp;
+
+                        sf_vm_addframe (vm, frt);
+                        fr = &vm->frames[vm->fp - 1];
+                        vm->ip = lp - 1;
+
+                        if (i.b == 1)
+                          fr->pop_ret_val = 0; /* need return value */
+                        else
+                          fr->pop_ret_val
+                              = 1; /* dont need return value (stmt call) */
                       }
                       break;
 
@@ -292,12 +483,20 @@ sf_vm_exec_frame_top (vm_t *vm)
               default:
                 break;
               }
+
+            DR (name);
+
+            // for (size_t i = 0; i < al; i++)
+            //   {
+            //     DR (args[i]);
+            //   }
           }
           break;
 
         case OP_ADD_1:
           {
             obj_t *p = pop (vm);
+            // IR (p);
 
             if (p->type == OBJ_CONST && p->v.o_const.v.type == CONST_INT)
               {
@@ -315,7 +514,10 @@ sf_vm_exec_frame_top (vm_t *vm)
                   }
 
                 push (vm, o);
+                IR (o);
               }
+
+            DR (p);
           }
           break;
 
@@ -323,6 +525,9 @@ sf_vm_exec_frame_top (vm_t *vm)
           {
             obj_t *l = pop (vm);
             obj_t *r = pop (vm);
+
+            // IR (l);
+            // IR (r);
 
             if (r->type == l->type && l->type == OBJ_CONST
                 && l->v.o_const.v.type == r->v.o_const.v.type
@@ -342,7 +547,11 @@ sf_vm_exec_frame_top (vm_t *vm)
                   }
 
                 push (vm, o);
+                IR (o);
               }
+
+            DR (l);
+            DR (r);
           }
           break;
 
@@ -350,6 +559,9 @@ sf_vm_exec_frame_top (vm_t *vm)
           {
             obj_t *l = pop (vm);
             obj_t *r = pop (vm);
+
+            // IR (l);
+            // IR (r);
 
             if (r->type == l->type && l->type == OBJ_CONST
                 && l->v.o_const.v.type == r->v.o_const.v.type
@@ -369,7 +581,11 @@ sf_vm_exec_frame_top (vm_t *vm)
                   }
 
                 push (vm, o);
+                IR (o);
               }
+
+            DR (l);
+            DR (r);
           }
           break;
 
@@ -377,6 +593,9 @@ sf_vm_exec_frame_top (vm_t *vm)
           {
             obj_t *l = pop (vm);
             obj_t *r = pop (vm);
+
+            // IR (l);
+            // IR (r);
 
             if (r->type == l->type && l->type == OBJ_CONST
                 && l->v.o_const.v.type == r->v.o_const.v.type
@@ -396,7 +615,83 @@ sf_vm_exec_frame_top (vm_t *vm)
                   }
 
                 push (vm, o);
+                IR (o);
               }
+
+            DR (l);
+            DR (r);
+          }
+          break;
+
+        case OP_CMP:
+          {
+            obj_t *l = pop (vm);
+            obj_t *r = pop (vm);
+
+            // IR (l);
+            // IR (r);
+
+            int rc = 0;
+
+            switch (i.a)
+              {
+              case CMP_EQEQ:
+                {
+                  rc = sf_obj_eqeq (l, r);
+                }
+                break;
+
+              case CMP_GE:
+                {
+                  rc = sf_obj_ge (l, r);
+                }
+                break;
+
+              case CMP_GEQ:
+                {
+                  rc = sf_obj_geq (l, r);
+                }
+                break;
+
+              case CMP_LE:
+                {
+                  rc = sf_obj_le (l, r);
+                }
+                break;
+
+              case CMP_LEQ:
+                {
+                  rc = sf_obj_leq (l, r);
+                }
+                break;
+
+              case CMP_NEQ:
+                {
+                  rc = sf_obj_neq (l, r);
+                }
+                break;
+
+              default:
+                break;
+              }
+
+            const_t bc = (const_t){ .type = CONST_BOOL, .v.c_bool.v = rc };
+
+            obj_t *o_bc = sf_objstore_req_forconst (&bc);
+
+            if (o_bc == NULL)
+              {
+                o_bc = sf_objstore_req ();
+
+                o_bc->type = OBJ_CONST;
+                o_bc->v.o_const.v = bc;
+              }
+
+            push (vm, o_bc);
+            IR (o_bc);
+
+            DR (l);
+            DR (r);
           }
           break;
 
@@ -410,11 +705,43 @@ sf_vm_exec_frame_top (vm_t *vm)
 end:;
 
   vm->ip = fr->return_ip;
+  i = vm->insts[vm->ip];
 
-  //   while (vm->sp > fr->stack_base)
-  //     pop (vm);
+  // while (vm->sp > fr->stack_base)
+  //   {
+  //     DR (pop (vm));
+  //   }
   //   //   vm->sp = fr->stack_base;
-  //   sf_vm_popframe (vm);
+  // if (vm->fp)
+  //   {
+  //     sf_vm_popframe (vm);
+  //   }
+
+  if (fr->pop_ret_val)
+    {
+      DR (pop (vm));
+    }
+  else
+    {
+      // obj_t *o = pop (vm);
+
+      // while (vm->sp > fr->stack_base)
+      //   {
+      //     DR (pop (vm));
+      //   }
+
+      // push (vm, o);
+    }
+
+  if (vm->fp == 1)
+    {
+    }
+  else if (vm->fp > 1)
+    {
+      sf_vm_popframe (vm);
+      fr = &vm->frames[vm->fp - 1];
+      goto start;
+    }
 }
 
 SF_API frame_t
@@ -446,11 +773,11 @@ sf_vm_addframe (vm_t *vm, frame_t f)
 SF_API void
 sf_vm_popframe (vm_t *vm)
 {
-  frame_t *f = &vm->frames[vm->fp - 1];
+  // frame_t *f = &vm->frames[vm->fp - 1];
 
-  for (int i = 0; i < f->locals_count; i++)
-    if (f->locals[i] != NULL)
-      DR (f->locals[i]);
+  // for (int i = 0; i < f->locals_count; i++)
+  //   if (f->locals[i] != NULL)
+  //     DR (f->locals[i]);
 
   sf_vm_framefree (&vm->frames[--vm->fp]);
 }
@@ -458,9 +785,14 @@ sf_vm_popframe (vm_t *vm)
 SF_API void
 sf_vm_framefree (frame_t *f)
 {
-  for (int i = 0; i < f->locals_count; i++)
-    if (f->locals[i] != NULL)
-      DR (f->locals[i]);
+  // D (printf ("%lu\n", f->locals_count));
+  for (int i = 0; i < f->locals_cap; i++)
+    {
+      if (f->locals[i] != NULL)
+        {
+          DR (f->locals[i]);
+        }
+    }
 
   SFFREE (f->locals);
 }

@@ -66,6 +66,14 @@ sf_objstore_init ()
   o.meta.ref_count = 1;
 
   objstore[osl++][0] = o;
+
+  /* store none object */
+  objstore[osl] = SFMALLOC (sizeof (**objstore));
+  obj_t nobj = sf_objnew (OBJ_CONST);
+  nobj.v.o_const.v.type = CONST_NONE;
+  nobj.meta.ref_count = 1;
+
+  objstore[osl++][0] = nobj;
 }
 
 SF_API obj_t *
@@ -127,7 +135,7 @@ sf_obj_rc_dec (obj_t *o)
   int old = atomic_fetch_sub_explicit (&o->meta.ref_count, 1,
                                        memory_order_acq_rel);
 
-  if (old == 1)
+  if (old <= 1)
     {
       atomic_thread_fence (memory_order_acquire);
       /* free object */
@@ -139,6 +147,11 @@ SF_API void
 sf_obj_free (obj_t *o)
 {
   o->meta.active = 0;
+
+  if (o->type == OBJ_FUNC && o->v.o_fun.v->type == FUN_CODED)
+    {
+      SFFREE (o->v.o_fun.v);
+    }
 
   if (osfil >= osfic)
     {
@@ -171,6 +184,9 @@ sf_objstore_req_forconst (const_t *c)
           return objstore[5 + 255 + 1] /* all int constants + 1 */;
       }
       break;
+    case CONST_NONE:
+      return objstore[5 + 255 + 2];
+      break;
 
     default:
       break;
@@ -197,6 +213,12 @@ sf_obj_print (obj_t o)
             break;
           case CONST_STRING:
             printf ("%s", c->v.c_str.v);
+            break;
+          case CONST_NONE:
+            printf ("none");
+            break;
+          case CONST_BOOL:
+            printf ("%s", c->v.c_bool.v ? "true" : "false");
             break;
           default:
             printf ("<const:unknown>");
@@ -232,7 +254,7 @@ sf_obj_isfalse (obj_t o)
             break;
 
           case CONST_BOOL:
-            r = o.v.o_const.v.v.c_bool.v;
+            r = !o.v.o_const.v.v.c_bool.v;
             break;
 
           case CONST_FLOAT:
@@ -262,4 +284,189 @@ sf_obj_isfalse (obj_t o)
     }
 
   return r;
+}
+
+SF_API int
+sf_obj_eqeq (obj_t *o, obj_t *p)
+{
+  if (o->type != p->type)
+    return 0;
+
+  switch (o->type)
+    {
+    case OBJ_CONST:
+      {
+        switch (o->v.o_const.v.type)
+          {
+          case CONST_BOOL:
+            return p->v.o_const.v.type == CONST_BOOL
+                   && p->v.o_const.v.v.c_bool.v == o->v.o_const.v.v.c_bool.v;
+            break;
+
+          case CONST_NONE:
+            return p->v.o_const.v.type == CONST_NONE;
+            break;
+
+          case CONST_STRING:
+            return p->v.o_const.v.type == CONST_STRING
+                   && !strcmp (p->v.o_const.v.v.c_str.v,
+                               o->v.o_const.v.v.c_str.v);
+            break;
+
+          case CONST_INT:
+            {
+              if (p->v.o_const.v.type == CONST_INT)
+                return p->v.o_const.v.v.c_int.v == o->v.o_const.v.v.c_int.v;
+              else if (p->v.o_const.v.type == CONST_FLOAT)
+                return p->v.o_const.v.v.c_float.v == o->v.o_const.v.v.c_int.v;
+              else
+                return 0;
+            }
+            break;
+
+          case CONST_FLOAT:
+            {
+              if (p->v.o_const.v.type == CONST_INT)
+                return p->v.o_const.v.v.c_int.v == o->v.o_const.v.v.c_float.v;
+              else if (p->v.o_const.v.type == CONST_FLOAT)
+                return p->v.o_const.v.v.c_float.v
+                       == o->v.o_const.v.v.c_float.v;
+              else
+                return 0;
+            }
+            break;
+
+          default:
+            break;
+          }
+      }
+      break;
+
+    case OBJ_FUNC:
+      return p->v.o_fun.v == o->v.o_fun.v;
+      break;
+
+    default:
+      break;
+    }
+
+  return 0;
+}
+
+SF_API int
+sf_obj_neq (obj_t *o, obj_t *p)
+{
+  return !sf_obj_eqeq (o, p);
+}
+
+SF_API int
+sf_obj_le (obj_t *o, obj_t *p)
+{
+  if (o->type == OBJ_CONST && p->type == OBJ_CONST
+      && (o->v.o_const.v.type == CONST_INT
+          || o->v.o_const.v.type == CONST_FLOAT)
+      && (p->v.o_const.v.type == CONST_INT
+          || p->v.o_const.v.type == CONST_FLOAT))
+    {
+      float v1 = 0.0f;
+      float v2 = 0.0f;
+
+      if (o->v.o_const.v.type == CONST_INT)
+        v1 = (float)o->v.o_const.v.v.c_int.v;
+      else
+        v1 = o->v.o_const.v.v.c_float.v;
+
+      if (p->v.o_const.v.type == CONST_INT)
+        v2 = (float)p->v.o_const.v.v.c_int.v;
+      else
+        v2 = p->v.o_const.v.v.c_float.v;
+
+      return v1 < v2;
+    }
+
+  return 0;
+}
+
+SF_API int
+sf_obj_ge (obj_t *o, obj_t *p)
+{
+  if (o->type == OBJ_CONST && p->type == OBJ_CONST
+      && (o->v.o_const.v.type == CONST_INT
+          || o->v.o_const.v.type == CONST_FLOAT)
+      && (p->v.o_const.v.type == CONST_INT
+          || p->v.o_const.v.type == CONST_FLOAT))
+    {
+      float v1 = 0.0f;
+      float v2 = 0.0f;
+
+      if (o->v.o_const.v.type == CONST_INT)
+        v1 = (float)o->v.o_const.v.v.c_int.v;
+      else
+        v1 = o->v.o_const.v.v.c_float.v;
+
+      if (p->v.o_const.v.type == CONST_INT)
+        v2 = (float)p->v.o_const.v.v.c_int.v;
+      else
+        v2 = p->v.o_const.v.v.c_float.v;
+
+      return v1 > v2;
+    }
+
+  return 0;
+}
+
+SF_API int
+sf_obj_leq (obj_t *o, obj_t *p)
+{
+  if (o->type == OBJ_CONST && p->type == OBJ_CONST
+      && (o->v.o_const.v.type == CONST_INT
+          || o->v.o_const.v.type == CONST_FLOAT)
+      && (p->v.o_const.v.type == CONST_INT
+          || p->v.o_const.v.type == CONST_FLOAT))
+    {
+      float v1 = 0.0f;
+      float v2 = 0.0f;
+
+      if (o->v.o_const.v.type == CONST_INT)
+        v1 = (float)o->v.o_const.v.v.c_int.v;
+      else
+        v1 = o->v.o_const.v.v.c_float.v;
+
+      if (p->v.o_const.v.type == CONST_INT)
+        v2 = (float)p->v.o_const.v.v.c_int.v;
+      else
+        v2 = p->v.o_const.v.v.c_float.v;
+
+      return v1 <= v2;
+    }
+
+  return 0;
+}
+
+SF_API int
+sf_obj_geq (obj_t *o, obj_t *p)
+{
+  if (o->type == OBJ_CONST && p->type == OBJ_CONST
+      && (o->v.o_const.v.type == CONST_INT
+          || o->v.o_const.v.type == CONST_FLOAT)
+      && (p->v.o_const.v.type == CONST_INT
+          || p->v.o_const.v.type == CONST_FLOAT))
+    {
+      float v1 = 0.0f;
+      float v2 = 0.0f;
+
+      if (o->v.o_const.v.type == CONST_INT)
+        v1 = (float)o->v.o_const.v.v.c_int.v;
+      else
+        v1 = o->v.o_const.v.v.c_float.v;
+
+      if (p->v.o_const.v.type == CONST_INT)
+        v2 = (float)p->v.o_const.v.v.c_int.v;
+      else
+        v2 = p->v.o_const.v.v.c_float.v;
+
+      return v1 >= v2;
+    }
+
+  return 0;
 }

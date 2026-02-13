@@ -77,6 +77,14 @@ sf_stmt_print (stmt_t s)
       }
       break;
 
+    case STMT_RETURN:
+      {
+        printf ("STMT_RETURN: expr = ");
+        sf_expr_print (*s.v.s_return.v);
+        putchar ('\n');
+      }
+      break;
+
     case STMT_EOF:
       {
         printf ("STMT_EOF\n");

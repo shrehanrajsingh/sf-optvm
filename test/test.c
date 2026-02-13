@@ -406,9 +406,10 @@ test3 ()
 
     IR (putln_o);
 
-    size_t *s = SFMALLOC (sizeof (*s));
-    *s = vm.meta.g_slot;
-    sf_ht_insert (vm.ht, "putln", (void *)s);
+    vval_t *s = SFMALLOC (sizeof (*s));
+    s->pos = vm.meta.g_slot;
+    s->slot = SF_VM_SLOT_GLOBAL;
+    sf_ht_insert (vm.hts[vm.htl - 1], "putln", (void *)s);
     vm.globals[vm.meta.g_slot++] = putln_o;
   }
 
@@ -425,9 +426,10 @@ test3 ()
 
     IR (put_o);
 
-    size_t *s = SFMALLOC (sizeof (*s));
-    *s = vm.meta.g_slot;
-    sf_ht_insert (vm.ht, "put", (void *)s);
+    vval_t *s = SFMALLOC (sizeof (*s));
+    s->pos = vm.meta.g_slot;
+    s->slot = SF_VM_SLOT_GLOBAL;
+    sf_ht_insert (vm.hts[vm.htl - 1], "put", (void *)s);
     vm.globals[vm.meta.g_slot++] = put_o;
   }
 
@@ -438,6 +440,7 @@ test3 ()
 
   frame_t top = sf_frame_new ();
   top.return_ip = vm.inst_len - 1;
+  top.stack_base = vm.sp;
   sf_vm_addframe (&vm, top);
 
   double start = now_sec ();

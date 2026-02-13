@@ -60,6 +60,28 @@ add_inst (vm_t *vm, instr_t i)
   vm->insts[vm->inst_len++] = i;
 }
 
+hashtable_t *
+push_ht (vm_t *vm)
+{
+  if (vm->htl >= vm->htc)
+    {
+      vm->htc += SF_VM_HT_CAP;
+      vm->hts = SFREALLOC (vm->hts, vm->htc * sizeof (*vm->hts));
+    }
+
+  vm->hts[vm->htl] = sf_ht_new ();
+  return vm->hts[vm->htl++];
+}
+
+void
+pop_ht (vm_t *vm)
+{
+  if (!vm->htl)
+    return;
+
+  sf_ht_free (vm->hts[--vm->htl]);
+}
+
 int
 const_eqeq (const_t c, const_t d)
 {
@@ -106,10 +128,33 @@ const_eqeq (const_t c, const_t d)
   vm->meta.slot = _pres_slot;
 
 static vval_t *
-get_var (vm_t *vm, const char *name)
+get_var (vm_t *vm, const char *name, int *level_ptr)
 {
   int gt = 0;
-  vval_t *v = sf_ht_get (vm->ht, name, &gt);
+  vval_t *v = sf_ht_get (vm->hts[vm->htl - 1], name, &gt);
+  int l = vm->htl - 1;
+  int level = 0;
+
+  while (!gt)
+    {
+      if (l < 1)
+        break;
+
+      v = sf_ht_get (vm->hts[--l], name, &gt);
+      level++;
+    }
+
+  if (level_ptr != NULL)
+    *level_ptr = level;
+
+  return v;
+}
+
+static vval_t *
+get_var_look_top (vm_t *vm, const char *name)
+{
+  int gt = 0;
+  vval_t *v = sf_ht_get (vm->hts[vm->htl - 1], name, &gt);
 
   if (!gt)
     return NULL;
@@ -120,7 +165,7 @@ get_var (vm_t *vm, const char *name)
 static vval_t *
 add_var (vm_t *vm, const char *name)
 {
-  vval_t *v = get_var (vm, name);
+  vval_t *v = get_var_look_top (vm, name);
 
   if (v != NULL)
     {
@@ -139,7 +184,7 @@ add_var (vm_t *vm, const char *name)
       v->pos = vm->meta.l_slot++;
     }
 
-  sf_ht_insert (vm->ht, name, (void *)v);
+  sf_ht_insert (vm->hts[vm->htl - 1], name, (void *)v);
   return v;
 }
 
@@ -150,7 +195,8 @@ sf_vm_gen_b_fromexpr (vm_t *vm, expr_t e)
     {
     case EXPR_VAR:
       {
-        vval_t *v = get_var (vm, e.v.e_var.v);
+        int lev = 0;
+        vval_t *v = get_var (vm, e.v.e_var.v, &lev);
 
         if (v == NULL)
           {
@@ -168,11 +214,13 @@ sf_vm_gen_b_fromexpr (vm_t *vm, expr_t e)
           }
         else if (v->slot == SF_VM_SLOT_LOCAL)
           {
-            add_inst (vm, (instr_t){
-                              .op = OP_LOAD_FAST,
-                              .a = v->pos,
-                              .b = 0,
-                          });
+            add_inst (
+                vm,
+                (instr_t){
+                    .op = OP_LOAD_FAST,
+                    .a = v->pos,
+                    .b = lev, /* how many frames up can we find the variable */
+                });
           }
       }
       break;
@@ -285,6 +333,34 @@ sf_vm_gen_b_fromexpr (vm_t *vm, expr_t e)
       }
       break;
 
+    case EXPR_FUNCALL:
+      {
+        size_t al = e.v.e_funcall.al;
+        expr_t **args = e.v.e_funcall.args;
+        expr_t *name = e.v.e_funcall.name;
+
+        for (size_t i = 0; i < al; i++)
+          sf_vm_gen_b_fromexpr (vm, *args[i]);
+
+        sf_vm_gen_b_fromexpr (vm, *name);
+
+        add_inst (vm, (instr_t){
+                          .op = OP_CALL,
+                          .a = al,
+                          .b = 1, /* 1 means push the return value to stack */
+                      });
+      }
+      break;
+
+    case EXPR_CMP:
+      {
+        sf_vm_gen_b_fromexpr (vm, *e.v.e_cmp.left);
+        sf_vm_gen_b_fromexpr (vm, *e.v.e_cmp.right);
+
+        add_inst (vm, (instr_t){ .op = OP_CMP, .a = e.v.e_cmp.type, .b = 0 });
+      }
+      break;
+
     default:
       break;
     }
@@ -316,11 +392,18 @@ sf_vm_gen_bytecode (vm_t *vm, StmtSM *smt)
                 {
                   vval_t *v = add_var (vm, (char *)name->v.e_var.v);
 
-                  add_inst (vm, (instr_t){
-                                    .op = OP_STORE,
-                                    .a = v->pos,
-                                    .b = v->slot,
-                                });
+                  if (v->slot == SF_VM_SLOT_LOCAL)
+                    add_inst (vm, (instr_t){
+                                      .op = OP_STORE_FAST,
+                                      .a = v->pos,
+                                      .b = 0,
+                                  });
+                  else if (v->slot == SF_VM_SLOT_GLOBAL)
+                    add_inst (vm, (instr_t){
+                                      .op = OP_STORE,
+                                      .a = v->pos,
+                                      .b = 0,
+                                  });
                 }
                 break;
 
@@ -380,14 +463,16 @@ sf_vm_gen_bytecode (vm_t *vm, StmtSM *smt)
                           });
 
             instr_t *q = &vm->insts[vm->inst_len - 1];
-
-            smt.vals = else_body;
-            smt.vl = smt.vc = ebl;
-
             p->a = vm->inst_len;
 
-            sf_vm_gen_bytecode (vm, &smt);
-            vm->inst_len--; // eat return
+            if (ebl)
+              {
+                smt.vals = else_body;
+                smt.vl = smt.vc = ebl;
+
+                sf_vm_gen_bytecode (vm, &smt);
+                vm->inst_len--; // eat return
+              }
 
             q->a = vm->inst_len;
           }
@@ -430,6 +515,108 @@ sf_vm_gen_bytecode (vm_t *vm, StmtSM *smt)
           }
           break;
 
+        case STMT_FUNDECL:
+          {
+            size_t argc = s->v.s_fundecl.argc;
+            expr_t **args = s->v.s_fundecl.args;
+            size_t bl = s->v.s_fundecl.bl;
+            stmt_t *body = s->v.s_fundecl.body;
+            const char *name = s->v.s_fundecl.name;
+
+            vval_t *nl = add_var (vm, name);
+
+            PRESERVE (vm);
+
+            // hashtable_t *ht = sf_ht_new ();
+            // hashtable_t *ht_pres = vm->ht;
+            // vm->ht = ht;
+
+            vval_t *vlt[128];
+            size_t vltc = 0;
+
+            push_ht (vm);
+
+            vm->meta.slot = SF_VM_SLOT_LOCAL;
+            for (size_t i = 0; i < argc; i++)
+              {
+                expr_t *arg = args[i];
+
+                if (arg->type == EXPR_VAR)
+                  {
+                    const char *n = arg->v.e_var.v;
+
+                    vlt[vltc++] = add_var (vm, n);
+                  }
+              }
+
+            StmtSM smt;
+            smt.vals = body;
+            smt.vl = smt.vc = bl;
+
+            add_inst (vm, (instr_t){
+                              .op = OP_JUMP,
+                              .a = 0,
+                              .b = 0,
+                          });
+
+            instr_t *p = &vm->insts[vm->inst_len - 1];
+            size_t ql = vm->inst_len;
+
+            for (size_t i = 0; i < vltc; i++)
+              {
+                add_inst (vm, (instr_t){
+                                  .op = OP_STORE_FAST,
+                                  .a = vlt[i]->pos,
+                                  .b = 0,
+                              });
+              }
+
+            sf_vm_gen_bytecode (vm, &smt);
+            /* no eating return here, because we need return */
+
+            pop_ht (vm);
+
+            p->a = vm->inst_len;
+
+            add_inst (vm, (instr_t){
+                              .op = OP_LOAD_FUNC_CODED,
+                              .a = ql,
+                              .b = argc,
+                          });
+
+            // vm->ht = ht_pres;
+            // sf_ht_free (ht);
+
+            RESTORE (vm);
+
+            if (nl->slot == SF_VM_SLOT_LOCAL)
+              add_inst (vm, (instr_t){
+                                .op = OP_STORE_FAST,
+                                .a = nl->pos,
+                                .b = 0,
+                            });
+            else if (nl->slot == SF_VM_SLOT_GLOBAL)
+              add_inst (vm, (instr_t){
+                                .op = OP_STORE,
+                                .a = nl->pos,
+                                .b = 0,
+                            });
+          }
+          break;
+
+        case STMT_RETURN:
+          {
+            sf_vm_gen_b_fromexpr (vm, *s->v.s_return.v);
+
+            add_inst (vm,
+                      (instr_t){
+                          .op = OP_RETURN,
+                          .a = 1, /* 1 means the return is coded by the user */
+                          .b = 0,
+                      });
+          }
+          break;
+
         default:
           break;
         }
@@ -439,7 +626,8 @@ end:;
 
   add_inst (vm, (instr_t){
                     .op = OP_RETURN,
-                    .a = 0,
+                    .a = 0, /* 0 means the user hasnt written a return
+                               anywhere, but the routine has to end somehow */
                     .b = 0,
                 });
 }

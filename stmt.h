@@ -12,6 +12,7 @@ enum StmtType
   STMT_IFBLOCK,
   STMT_WHILE,
   STMT_FUNDECL,
+  STMT_RETURN,
   STMT_EOF
 };
 
@@ -65,6 +66,12 @@ typedef struct __stmt_s
       size_t bl;
 
     } s_fundecl;
+
+    struct
+    {
+      expr_t *v;
+
+    } s_return;
 
   } v;
 

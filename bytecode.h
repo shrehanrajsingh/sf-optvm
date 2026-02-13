@@ -15,6 +15,7 @@ typedef enum OpcodeType
   OP_LOAD_FAST, /* local var */
   OP_LOAD,
   OP_STORE,
+  OP_STORE_FAST,
   OP_CALL,
   OP_ADD_1,
   OP_ADD,
@@ -23,6 +24,8 @@ typedef enum OpcodeType
   OP_DIV,
   OP_JUMP,
   OP_JUMP_IF_FALSE,
+  OP_LOAD_FUNC_CODED,
+  OP_CMP,
   //   OP_STACK_POP,
   //   OP_STACK_PUSH,
   OP_RETURN
@@ -46,6 +49,7 @@ typedef struct _frame_s
   size_t locals_count;
 
   size_t stack_base;
+  int pop_ret_val; // 1: yes, 0: no
 
 } frame_t;
 
@@ -69,7 +73,9 @@ typedef struct _vm_s
   size_t s_ml;
   size_t s_mc;
 
-  hashtable_t *ht;
+  hashtable_t **hts;
+  size_t htl;
+  size_t htc;
 
   obj_t **globals; /* var name -> slot; globals[slot] = var_value */
   size_t globals_cap;
@@ -94,6 +100,7 @@ typedef struct _vm_s
 #define SF_VM_GLOBALS_CAP (512)
 #define SF_VM_STACK_CAP (128)
 #define SF_VM_FRAME_CAP (500)
+#define SF_VM_HT_CAP (8)
 
 #define SF_VM_SLOT_GLOBAL (0)
 #define SF_VM_SLOT_LOCAL (1)

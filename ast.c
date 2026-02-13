@@ -197,12 +197,12 @@ sf_ast_gen (TokenSM *smt)
             else if (*op == '(')
               {
                 token_t *smt_front = smtv;
-                token_t *smt_back = --smtv;
+                token_t *smt_back = --smtv; // come to '('
 
                 int gb = 0;
                 token_t t;
 
-                while (!gb && smt_back > smt->vals)
+                while (smt_back > smt->vals)
                   {
                     t = *--smt_back;
 
@@ -240,7 +240,7 @@ sf_ast_gen (TokenSM *smt)
 
                 token_t *left = smt_front;
 
-                while (!gb && smt_front->type != TOK_EOF)
+                while (smt_front->type != TOK_EOF)
                   {
                     t = *smt_front++;
 
@@ -643,6 +643,57 @@ sf_ast_gen (TokenSM *smt)
                 smtv = block_end;
                 res->vals[res->vl++] = st;
               }
+            else if (!strcmp (kw, "return"))
+              {
+                token_t *x = smtv;
+
+                if (x->type == TOK_NEWLINE)
+                  {
+                    /* return none */
+                    stmt_t st;
+                    st.type = STMT_RETURN;
+                    expr_t *re = SFMALLOC (sizeof (*re));
+                    re->type = EXPR_CONST;
+                    re->v.e_const.v.type = CONST_NONE;
+                    st.v.s_return.v = re;
+                    res->vals[res->vl++] = st;
+                  }
+                else
+                  {
+                    token_t *y = smtv;
+                    int gb = 0;
+
+                    while (y->type != TOK_EOF)
+                      {
+                        token_t t = *++y;
+
+                        if (y->type == TOK_OPERATOR)
+                          {
+                            const char *op = y->v.t_operator.value;
+
+                            if (strstr ("({[", op) != NULL)
+                              gb++;
+
+                            if (strstr (")}]", op) != NULL)
+                              gb--;
+                          }
+
+                        if (t.type == TOK_NEWLINE && !gb)
+                          {
+                            break;
+                          }
+                      }
+
+                    expr_t *re = sf_expr_gen (x, y);
+
+                    stmt_t st;
+                    st.type = STMT_RETURN;
+                    st.v.s_return.v = re;
+                    res->vals[res->vl++] = st;
+
+                    smtv = --y;
+                  }
+              }
           }
           break;
 
@@ -763,7 +814,7 @@ sf_expr_gen (token_t *start, token_t *end)
                 token_t *l1 = start;
                 t = *start;
 
-                while (start != end)
+                while (start <= end)
                   {
                     // sf_token_print (t);
                     if (t.type == TOK_OPERATOR)
@@ -881,6 +932,82 @@ sf_expr_gen (token_t *start, token_t *end)
                   }
 
                 start = end;
+                goto end;
+              }
+            else if (*op == '(')
+              {
+                expr_t *args[64];
+                size_t al = 0;
+
+                expr_t r;
+                r.type = EXPR_FUNCALL;
+
+                token_t *left = start;
+                int gb = 0;
+                int _end = 0;
+
+                while (start <= end)
+                  {
+                    token_t u = *start++;
+
+                    if (u.type == TOK_OPERATOR)
+                      {
+                        const char *op = u.v.t_operator.value;
+
+                        if (*op == ')' && !gb)
+                          {
+                            _end = 1;
+                            if (left == start - 1)
+                              {
+                                /* no args */
+                              }
+                            else
+                              {
+                                args[al++] = sf_expr_gen (left, start - 1);
+                              }
+                            break;
+                          }
+
+                        if (*op == ',' && !gb)
+                          {
+                            args[al++] = sf_expr_gen (left, start - 2);
+                            left = start;
+                          }
+
+                        if (strstr ("({[", op) != NULL)
+                          gb++;
+
+                        if (strstr (")}]", op) != NULL)
+                          gb--;
+                      }
+                  }
+
+                assert (_end && "syntax error");
+                r.v.e_funcall.name = SFMALLOC (sizeof (*r.v.e_funcall.name));
+                *r.v.e_funcall.name = e;
+                r.v.e_funcall.al = al;
+                r.v.e_funcall.args = SFMALLOC (r.v.e_funcall.al
+                                               * sizeof (*r.v.e_funcall.args));
+
+                for (size_t i = 0; i < al; i++)
+                  r.v.e_funcall.args[i] = args[i];
+
+                e = r;
+              }
+            else if (op[1] == '=')
+              {
+                expr_t re;
+                re.type = EXPR_CMP;
+                re.v.e_cmp.left = SFMALLOC (sizeof (*re.v.e_cmp.left));
+                *re.v.e_cmp.left = e;
+
+                if (*op == '=')
+                  {
+                    re.v.e_cmp.type = CMP_EQEQ;
+                    re.v.e_cmp.right = sf_expr_gen (start, end);
+                  }
+
+                e = re;
                 goto end;
               }
           }

@@ -71,6 +71,13 @@ extern "C"
 
   SF_API int sf_obj_isfalse (obj_t);
 
+  SF_API int sf_obj_eqeq (obj_t *, obj_t *);
+  SF_API int sf_obj_neq (obj_t *, obj_t *);
+  SF_API int sf_obj_le (obj_t *, obj_t *);
+  SF_API int sf_obj_ge (obj_t *, obj_t *);
+  SF_API int sf_obj_leq (obj_t *, obj_t *);
+  SF_API int sf_obj_geq (obj_t *, obj_t *);
+
 #if defined(__cplusplus)
 }
 #endif // __cplusplus

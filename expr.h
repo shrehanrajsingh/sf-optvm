@@ -11,7 +11,19 @@ enum ExprType
   EXPR_VAR,
   EXPR_ADD_1,
   EXPR_ARITHMETIC,
+  EXPR_FUNCALL,
+  EXPR_CMP,
   EXPR_COUNT
+};
+
+enum CmpType
+{
+  CMP_EQEQ,
+  CMP_NEQ,
+  CMP_LE,
+  CMP_GE,
+  CMP_LEQ,
+  CMP_GEQ,
 };
 
 struct arith_s;
@@ -45,6 +57,22 @@ typedef struct __expr_s
       size_t tl;
 
     } e_arith;
+
+    struct
+    {
+      struct __expr_s *name;
+      struct __expr_s **args;
+      size_t al;
+
+    } e_funcall;
+
+    struct
+    {
+      int type;
+      struct __expr_s *left;
+      struct __expr_s *right;
+
+    } e_cmp;
 
   } v;
 

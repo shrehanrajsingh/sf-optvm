@@ -47,6 +47,53 @@ sf_expr_print (expr_t e)
         sf_arith_print_tree (e.v.e_arith.tree, e.v.e_arith.tl);
       }
       break;
+    case EXPR_FUNCALL:
+      {
+        printf ("EXPR_FUNCALL (%lu)\nname: ", e.v.e_funcall.al);
+        sf_expr_print (*e.v.e_funcall.name);
+
+        for (size_t i = 0; i < e.v.e_funcall.al; i++)
+          {
+            printf ("ARG (%lu): ", i);
+            sf_expr_print (*e.v.e_funcall.args[i]);
+          }
+      }
+      break;
+
+    case EXPR_CMP:
+      {
+        printf ("EXPR_CMP: ");
+        switch (e.v.e_cmp.type)
+          {
+          case CMP_EQEQ:
+            printf ("EQEQ");
+            break;
+          case CMP_NEQ:
+            printf ("NEQ");
+            break;
+          case CMP_LE:
+            printf ("LE");
+            break;
+          case CMP_GE:
+            printf ("GE");
+            break;
+          case CMP_LEQ:
+            printf ("LEQ");
+            break;
+          case CMP_GEQ:
+            printf ("GEQ");
+            break;
+
+          default:
+            break;
+          }
+
+        printf ("\nleft: ");
+        sf_expr_print (*e.v.e_cmp.left);
+        printf ("\nright: ");
+        sf_expr_print (*e.v.e_cmp.right);
+      }
+      break;
     default:
       {
         printf ("<expr?> %d\n", e.type);
