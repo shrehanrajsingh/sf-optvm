@@ -464,24 +464,6 @@ See [test/test.c](test/test.c) for a complete working example.
 
 ---
 
-## Roadmap
-
-| Priority | Feature | Status |
-|---|---|---|
-| 🔴 High | REPL and incremental compilation | Planned |
-| 🔴 High | Closures and upvalue capture | Planned |
-| 🟡 Medium | Standard library (I/O, collections, math) | Planned |
-| 🟡 Medium | Module import system | Keywords reserved |
-| 🟡 Medium | Methods and inheritance for classes | Planned |
-| 🟢 Future | Threaded/computed-goto dispatch for FISH | Planned |
-| 🟢 Future | Inline caching and peephole optimization | Planned |
-| 🟢 Future | Optional JIT tier | Planned |
-| 🟢 Future | Debug info, source maps, bytecode verifier | Planned |
-| 🟢 Future | Exception handling (`try/catch`) | Keywords reserved |
-| 🟢 Future | `for` loops, `break`, `continue` | Keywords reserved |
-
----
-
 ## License
 
 MIT License.
