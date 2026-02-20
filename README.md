@@ -4,7 +4,7 @@
 
 ### A lightweight, dynamically typed programming language powered by the **FISH** bytecode VM
 
-*Flower Instruction Set Hybrid — a clean, stack-based instruction set architecture written in C23*
+*Flower Instruction Set Hybrid: a clean, stack-based instruction set architecture written in C23*
 
 [![C Standard](https://img.shields.io/badge/C-C23-blue.svg)](#build-instructions)
 [![Build System](https://img.shields.io/badge/build-CMake%20≥%203.10-064F8C.svg)](#build-instructions)
