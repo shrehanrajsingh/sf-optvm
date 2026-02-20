@@ -668,6 +668,7 @@ sf_vm_gen_bytecode (vm_t *vm, StmtSM *smt)
             vm->meta.slot = SF_VM_SLOT_NAME;
 
             sf_vm_gen_bytecode (vm, &csm);
+            vm->inst_len--;
 
             pop_ht (vm);
 

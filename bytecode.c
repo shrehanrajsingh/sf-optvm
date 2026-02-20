@@ -246,6 +246,9 @@ start:;
 
                 fr->l.locals = SFREALLOC (
                     fr->l.locals, fr->l.locals_cap * sizeof (*fr->l.locals));
+
+                for (size_t j = fr->l.locals_count; j < fr->l.locals_cap; j++)
+                  fr->l.locals[j] = NULL;
               }
 
             if (i.a >= fr->l.locals_count)
@@ -259,10 +262,47 @@ start:;
           }
           break;
 
+        case OP_STORE_NAME:
+          {
+            obj_t *val = pop (vm);
+
+            if (i.a >= fr->n.nvc)
+              {
+                fr->n.nvc += SF_FRAME_LOCALS_CAP;
+
+                fr->n.names = SFREALLOC (fr->n.names,
+                                         fr->n.nvc * sizeof (*fr->n.names));
+
+                fr->n.vals
+                    = SFREALLOC (fr->n.vals, fr->n.nvc * sizeof (*fr->n.vals));
+
+                for (size_t j = fr->n.nvl; j < fr->n.nvc; j++)
+                  fr->n.vals[j] = NULL;
+              }
+
+            if (i.a >= fr->n.nvl)
+              fr->n.nvl = i.a + 1;
+
+            if (fr->n.vals[i.a] != NULL)
+              DR (fr->n.vals[i.a]);
+            fr->n.vals[i.a] = val;
+          }
+          break;
+
         case OP_LOAD:
           {
             obj_t *o = NULL;
             push (vm, o = vm->globals[i.a]);
+
+            if (o != NULL)
+              IR (o);
+          }
+          break;
+
+        case OP_LOAD_NAME:
+          {
+            obj_t *o = NULL;
+            push (vm, o = fr->n.vals[i.a]);
 
             if (o != NULL)
               IR (o);
@@ -707,6 +747,23 @@ start:;
           }
           break;
 
+        case OP_LOAD_BUILDCLASS:
+          {
+            frame_t nf = sf_frame_new_name ();
+
+            nf.return_ip = i.a; /* buildclass_end location */
+            sf_vm_addframe (vm, nf);
+
+            fr = &vm->frames[vm->fp - 1];
+          }
+          break;
+
+        case OP_LOAD_BUILDCLASS_END:
+          {
+            sf_vm_popframe (vm);
+          }
+          break;
+
         default:
           break;
         }
@@ -767,6 +824,9 @@ sf_frame_new_local ()
   f.l.locals = SFMALLOC (f.l.locals_cap * sizeof (*f.l.locals));
   f.stack_base = 0;
 
+  for (int i = 0; i < f.l.locals_cap; i++)
+    f.l.locals[i] = NULL;
+
   return f;
 }
 
@@ -781,6 +841,9 @@ sf_frame_new_name ()
   f.n.vals = SFMALLOC (f.n.nvc * sizeof (*f.n.vals));
   f.n.names = SFMALLOC (f.n.nvc * sizeof (*f.n.names));
   f.stack_base = 0;
+
+  for (int i = 0; i < f.n.nvc; i++)
+    f.n.vals[i] = NULL;
 
   return f;
 }
@@ -814,13 +877,37 @@ SF_API void
 sf_vm_framefree (frame_t *f)
 {
   // D (printf ("%lu\n", f->locals_count));
-  for (int i = 0; i < f->l.locals_cap; i++)
-    {
-      if (f->l.locals[i] != NULL)
-        {
-          DR (f->l.locals[i]);
-        }
-    }
 
-  SFFREE (f->l.locals);
+  switch (f->type)
+    {
+    case FRAME_LOCAL:
+      {
+        for (int i = 0; i < f->l.locals_cap; i++)
+          {
+            if (f->l.locals[i] != NULL)
+              {
+                DR (f->l.locals[i]);
+              }
+          }
+
+        SFFREE (f->l.locals);
+      }
+      break;
+
+    case FRAME_NAME:
+      {
+        for (size_t i = 0; i < f->n.nvc; i++)
+          {
+            if (f->n.vals[i] != NULL)
+              DR (f->n.vals[i]);
+          }
+
+        SFFREE (f->n.names);
+        SFFREE (f->n.vals);
+      }
+      break;
+
+    default:
+      break;
+    }
 }
