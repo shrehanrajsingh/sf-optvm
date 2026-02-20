@@ -438,7 +438,7 @@ test3 ()
   sf_vm_print_b (&vm);
   vm.fp = 0;
 
-  frame_t top = sf_frame_new ();
+  frame_t top = sf_frame_new_local ();
   top.return_ip = vm.inst_len - 1;
   top.stack_base = vm.sp;
   sf_vm_addframe (&vm, top);

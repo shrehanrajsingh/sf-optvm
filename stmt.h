@@ -13,6 +13,7 @@ enum StmtType
   STMT_WHILE,
   STMT_FUNDECL,
   STMT_RETURN,
+  STMT_CLASSDECL,
   STMT_EOF
 };
 
@@ -72,6 +73,14 @@ typedef struct __stmt_s
       expr_t *v;
 
     } s_return;
+
+    struct
+    {
+      const char *name;
+      struct __stmt_s *body;
+      size_t bl;
+
+    } s_classdecl;
 
   } v;
 

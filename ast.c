@@ -694,6 +694,53 @@ sf_ast_gen (TokenSM *smt)
                     smtv = --y;
                   }
               }
+            else if (!strcmp (kw, "class"))
+              {
+                size_t tb = get_tbsp (smtv, smt->vals);
+
+                token_t *t_name = smtv;
+                assert (t_name->type == TOK_IDENTIFIER);
+
+                const char *name = t_name->v.t_identifier.value;
+
+                token_t *block_end = get_block (++smtv, tb);
+
+                TokenSM tsmt;
+                tsmt.vals = smtv;
+                tsmt.vl = block_end - smtv;
+
+                // for (int i = 0; i < tsmt.vl; i++)
+                //   sf_token_print (tsmt.vals[i]);
+
+                // printf ("--------------\n");
+
+                block_end++;
+                token_t bep = *block_end;
+                block_end->type = TOK_EOF;
+
+                StmtSM *body_smt = sf_ast_gen (&tsmt);
+                *block_end = bep;
+
+                while (block_end->type != TOK_EOF)
+                  {
+                    if (block_end->type == TOK_NEWLINE
+                        || block_end->type == TOK_SPACE)
+                      ;
+                    else
+                      break;
+
+                    block_end++;
+                  }
+
+                stmt_t st;
+                st.type = STMT_CLASSDECL;
+                st.v.s_classdecl.name = name;
+                st.v.s_classdecl.body = body_smt->vals;
+                st.v.s_classdecl.bl = body_smt->vl;
+
+                res->vals[res->vl++] = st;
+                smtv = block_end;
+              }
           }
           break;
 

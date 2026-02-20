@@ -120,11 +120,13 @@ const_eqeq (const_t c, const_t d)
 #define PRESERVE(vm)                                                          \
   size_t _pres_g_slot = (vm)->meta.g_slot;                                    \
   size_t _pres_l_slot = (vm)->meta.l_slot;                                    \
+  size_t _pres_n_slot = (vm)->meta.n_slot;                                    \
   size_t _pres_slot = (vm)->meta.slot;
 
 #define RESTORE(vm)                                                           \
   vm->meta.g_slot = _pres_g_slot;                                             \
   vm->meta.l_slot = _pres_l_slot;                                             \
+  vm->meta.n_slot = _pres_n_slot;                                             \
   vm->meta.slot = _pres_slot;
 
 static vval_t *
@@ -183,6 +185,10 @@ add_var (vm_t *vm, const char *name)
     {
       v->pos = vm->meta.l_slot++;
     }
+  else if (v->slot == SF_VM_SLOT_NAME)
+    {
+      v->pos = vm->meta.n_slot++;
+    }
 
   sf_ht_insert (vm->hts[vm->htl - 1], name, (void *)v);
   return v;
@@ -221,6 +227,13 @@ sf_vm_gen_b_fromexpr (vm_t *vm, expr_t e)
                     .a = v->pos,
                     .b = lev, /* how many frames up can we find the variable */
                 });
+          }
+        else if (v->slot == SF_VM_SLOT_NAME)
+          {
+            add_inst (vm, (instr_t){ .op = OP_LOAD_NAME,
+                                     .a = v->pos,
+                                     .b = lev,
+                                     .c = (char *)e.v.e_var.v });
           }
       }
       break;
@@ -404,6 +417,11 @@ sf_vm_gen_bytecode (vm_t *vm, StmtSM *smt)
                                       .a = v->pos,
                                       .b = 0,
                                   });
+                  else if (v->slot == SF_VM_SLOT_NAME)
+                    add_inst (vm, (instr_t){ .op = OP_STORE_NAME,
+                                             .a = v->pos,
+                                             .b = 0,
+                                             .c = (char *)name->v.e_var.v });
                 }
                 break;
 
@@ -601,6 +619,12 @@ sf_vm_gen_bytecode (vm_t *vm, StmtSM *smt)
                                 .a = nl->pos,
                                 .b = 0,
                             });
+            else if (nl->slot == SF_VM_SLOT_NAME)
+              add_inst (vm, (instr_t){
+                                .op = OP_STORE_NAME,
+                                .a = nl->pos,
+                                .b = 0,
+                            });
           }
           break;
 
@@ -614,6 +638,50 @@ sf_vm_gen_bytecode (vm_t *vm, StmtSM *smt)
                           .a = 1, /* 1 means the return is coded by the user */
                           .b = 0,
                       });
+          }
+          break;
+
+        case STMT_CLASSDECL:
+          {
+            size_t bl = s->v.s_classdecl.bl;
+            stmt_t *body = s->v.s_classdecl.body;
+            const char *name = s->v.s_classdecl.name;
+
+            add_inst (vm, (instr_t){
+                              .op = OP_LOAD_BUILDCLASS,
+                              .a = 0, /* the corresponding LOAD_BUILDEND */
+                              .b = 0,
+                          });
+
+            size_t il = vm->inst_len - 1;
+            instr_t *p = &vm->insts[il];
+
+            StmtSM csm;
+            csm.vals = body;
+            csm.vl = csm.vc = bl;
+
+            vval_t *nl = add_var (vm, name);
+
+            PRESERVE (vm);
+
+            push_ht (vm);
+            vm->meta.slot = SF_VM_SLOT_NAME;
+
+            sf_vm_gen_bytecode (vm, &csm);
+
+            pop_ht (vm);
+
+            RESTORE (vm);
+
+            add_inst (vm, (instr_t){
+                              .op = OP_LOAD_BUILDCLASS_END,
+                              .a = 0, /* the corresponding LOAD_BUILDCLASS */
+                              .b = 0,
+                          });
+
+            instr_t *q = &vm->insts[vm->inst_len - 1];
+            p->a = vm->inst_len - 1;
+            q->a = il;
           }
           break;
 

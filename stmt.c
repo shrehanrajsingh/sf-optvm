@@ -85,6 +85,19 @@ sf_stmt_print (stmt_t s)
       }
       break;
 
+    case STMT_CLASSDECL:
+      {
+        printf ("STMT_CLASSDECL: name '%s'\n", s.v.s_classdecl.name);
+
+        printf ("body: (%lu)\n", s.v.s_classdecl.bl);
+        for (int i = 0; i < s.v.s_classdecl.bl; i++)
+          {
+            printf ("(%d) ", i + 1);
+            sf_stmt_print (s.v.s_classdecl.body[i]);
+          }
+      }
+      break;
+
     case STMT_EOF:
       {
         printf ("STMT_EOF\n");

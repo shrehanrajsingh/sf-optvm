@@ -50,6 +50,9 @@ sf_vm_print_inst (instr_t i)
     case OP_LOAD:
       fputs ("OP_LOAD:", stdout);
       break;
+    case OP_LOAD_NAME:
+      printf ("OP_LOAD_NAME: '%s' ", i.c);
+      break;
     case OP_STORE:
       fputs ("OP_STORE:", stdout);
       break;
@@ -88,6 +91,15 @@ sf_vm_print_inst (instr_t i)
       break;
     case OP_CMP:
       fputs ("OP_CMP:", stdout);
+      break;
+    case OP_LOAD_BUILDCLASS:
+      fputs ("OP_LOAD_BUILDCLASS:", stdout);
+      break;
+    case OP_LOAD_BUILDCLASS_END:
+      fputs ("OP_LOAD_BUILDCLASS_END:", stdout);
+      break;
+    case OP_STORE_NAME:
+      printf ("OP_STORE_NAME: '%s'", i.c);
       break;
     // case OP_STACK_POP:
     //   fputs ("OP_STACK_POP:", stdout);
@@ -228,20 +240,20 @@ start:;
             obj_t *val = pop (vm);
             // IR (val);
 
-            if (i.a >= fr->locals_cap)
+            if (i.a >= fr->l.locals_cap)
               {
-                fr->locals_cap += SF_FRAME_LOCALS_CAP;
+                fr->l.locals_cap += SF_FRAME_LOCALS_CAP;
 
-                fr->locals = SFREALLOC (fr->locals,
-                                        fr->locals_cap * sizeof (*fr->locals));
+                fr->l.locals = SFREALLOC (
+                    fr->l.locals, fr->l.locals_cap * sizeof (*fr->l.locals));
               }
 
-            if (i.a >= fr->locals_count)
-              fr->locals_count = i.a + 1;
+            if (i.a >= fr->l.locals_count)
+              fr->l.locals_count = i.a + 1;
 
-            if (fr->locals[i.a] != NULL)
-              DR (fr->locals[i.a]);
-            fr->locals[i.a] = val;
+            if (fr->l.locals[i.a] != NULL)
+              DR (fr->l.locals[i.a]);
+            fr->l.locals[i.a] = val;
 
             // push (vm, val);
           }
@@ -261,25 +273,25 @@ start:;
           {
             obj_t *o = NULL;
 
-            if (i.a >= fr->locals_cap)
+            if (i.a >= fr->l.locals_cap)
               {
-                fr->locals_cap += SF_FRAME_LOCALS_CAP;
+                fr->l.locals_cap += SF_FRAME_LOCALS_CAP;
 
-                fr->locals = SFREALLOC (fr->locals,
-                                        fr->locals_cap * sizeof (*fr->locals));
+                fr->l.locals = SFREALLOC (
+                    fr->l.locals, fr->l.locals_cap * sizeof (*fr->l.locals));
               }
 
-            if (i.a >= fr->locals_count)
-              fr->locals_count = i.a + 1;
+            if (i.a >= fr->l.locals_count)
+              fr->l.locals_count = i.a + 1;
 
             if (i.b == 0)
-              push (vm, o = fr->locals[i.a]);
+              push (vm, o = fr->l.locals[i.a]);
             else
               {
                 /* number of levels to go up is less than number of frames */
                 assert (i.b < vm->fp);
 
-                push (vm, o = vm->frames[i.b].locals[i.a]);
+                push (vm, o = vm->frames[i.b].l.locals[i.a]);
               }
 
             if (o != NULL)
@@ -457,7 +469,7 @@ start:;
                             // IR (args[i]);
                           }
 
-                        frame_t frt = sf_frame_new ();
+                        frame_t frt = sf_frame_new_local ();
                         frt.return_ip = vm->ip + 1;
                         // D (printf ("%d\n", fr.return_ip));
                         frt.stack_base = vm->sp;
@@ -745,13 +757,29 @@ end:;
 }
 
 SF_API frame_t
-sf_frame_new ()
+sf_frame_new_local ()
 {
   frame_t f;
+  f.type = FRAME_LOCAL;
   f.return_ip = 0;
-  f.locals_cap = SF_FRAME_LOCALS_CAP;
-  f.locals_count = 0;
-  f.locals = SFMALLOC (f.locals_cap * sizeof (*f.locals));
+  f.l.locals_cap = SF_FRAME_LOCALS_CAP;
+  f.l.locals_count = 0;
+  f.l.locals = SFMALLOC (f.l.locals_cap * sizeof (*f.l.locals));
+  f.stack_base = 0;
+
+  return f;
+}
+
+SF_API frame_t
+sf_frame_new_name ()
+{
+  frame_t f;
+  f.type = FRAME_NAME;
+  f.return_ip = 0;
+  f.n.nvc = SF_VM_NAME_CAP;
+  f.n.nvl = 0;
+  f.n.vals = SFMALLOC (f.n.nvc * sizeof (*f.n.vals));
+  f.n.names = SFMALLOC (f.n.nvc * sizeof (*f.n.names));
   f.stack_base = 0;
 
   return f;
@@ -786,13 +814,13 @@ SF_API void
 sf_vm_framefree (frame_t *f)
 {
   // D (printf ("%lu\n", f->locals_count));
-  for (int i = 0; i < f->locals_cap; i++)
+  for (int i = 0; i < f->l.locals_cap; i++)
     {
-      if (f->locals[i] != NULL)
+      if (f->l.locals[i] != NULL)
         {
-          DR (f->locals[i]);
+          DR (f->l.locals[i]);
         }
     }
 
-  SFFREE (f->locals);
+  SFFREE (f->l.locals);
 }
