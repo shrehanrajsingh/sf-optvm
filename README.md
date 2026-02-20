@@ -285,7 +285,7 @@ The repository builds a static library **`sunflower`** and a test harness **`TES
 
 | Path | Function | Description |
 |---|---|---|
-| AST interpreter | `test1()` | Lexes, parses, and tree-walks the AST directly |
+| AST interpreter (DEPRECATED) | `test1()` | Lexes, parses, and tree-walks the AST directly |
 | FISH bytecode VM | `test3()` | Lexes, parses, generates FISH bytecode via codegen, then executes on the VM |
 
 ```bash
