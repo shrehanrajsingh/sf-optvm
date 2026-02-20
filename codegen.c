@@ -374,6 +374,17 @@ sf_vm_gen_b_fromexpr (vm_t *vm, expr_t e)
       }
       break;
 
+    case EXPR_DOT_ACCESS:
+      {
+        sf_vm_gen_b_fromexpr (vm, *e.v.e_dota.left);
+
+        add_inst (vm, (instr_t){ .op = OP_DOT_ACCESS,
+                                 .a = 0,
+                                 .b = 0,
+                                 .c = e.v.e_dota.right });
+      }
+      break;
+
     default:
       break;
     }
@@ -624,6 +635,7 @@ sf_vm_gen_bytecode (vm_t *vm, StmtSM *smt)
                                 .op = OP_STORE_NAME,
                                 .a = nl->pos,
                                 .b = 0,
+                                .c = (char *)name,
                             });
           }
           break;
@@ -651,6 +663,7 @@ sf_vm_gen_bytecode (vm_t *vm, StmtSM *smt)
                               .op = OP_LOAD_BUILDCLASS,
                               .a = 0, /* the corresponding LOAD_BUILDEND */
                               .b = 0,
+                              .c = (char *)name,
                           });
 
             size_t il = vm->inst_len - 1;
@@ -659,8 +672,6 @@ sf_vm_gen_bytecode (vm_t *vm, StmtSM *smt)
             StmtSM csm;
             csm.vals = body;
             csm.vl = csm.vc = bl;
-
-            vval_t *nl = add_var (vm, name);
 
             PRESERVE (vm);
 
@@ -674,6 +685,8 @@ sf_vm_gen_bytecode (vm_t *vm, StmtSM *smt)
 
             RESTORE (vm);
 
+            vval_t *nl = add_var (vm, name);
+
             add_inst (vm, (instr_t){
                               .op = OP_LOAD_BUILDCLASS_END,
                               .a = 0, /* the corresponding LOAD_BUILDCLASS */
@@ -683,6 +696,26 @@ sf_vm_gen_bytecode (vm_t *vm, StmtSM *smt)
             instr_t *q = &vm->insts[vm->inst_len - 1];
             p->a = vm->inst_len - 1;
             q->a = il;
+
+            if (vm->meta.slot == SF_VM_SLOT_GLOBAL)
+              add_inst (vm, (instr_t){
+                                .op = OP_STORE,
+                                .a = nl->pos,
+                                .b = 0,
+                            });
+            else if (vm->meta.slot == SF_VM_SLOT_LOCAL)
+              add_inst (vm, (instr_t){
+                                .op = OP_STORE_FAST,
+                                .a = nl->pos,
+                                .b = 0,
+                            });
+            else if (vm->meta.slot == SF_VM_SLOT_NAME)
+              add_inst (vm, (instr_t){
+                                .op = OP_STORE_NAME,
+                                .a = nl->pos,
+                                .b = 0,
+                                .c = (char *)name,
+                            });
           }
           break;
 

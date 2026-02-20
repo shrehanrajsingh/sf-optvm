@@ -231,12 +231,16 @@ sf_obj_print (obj_t o)
       printf ("<function:%p>", (void *)o.v.o_fun.v);
       break;
 
+    case OBJ_CLASS:
+      printf ("<class '%s'>", o.v.o_class.v->name);
+      break;
+
     default:
       printf ("<object:unknown>");
       break;
     }
 
-  putchar ('\n');
+  // putchar ('\n');
 }
 
 SF_API int

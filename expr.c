@@ -94,6 +94,14 @@ sf_expr_print (expr_t e)
         sf_expr_print (*e.v.e_cmp.right);
       }
       break;
+
+    case EXPR_DOT_ACCESS:
+      {
+        printf ("EXPR_DOT_ACCESS:\nleft: ");
+        sf_expr_print (*e.v.e_dota.left);
+        printf ("\nright: %s\n", e.v.e_dota.right);
+      }
+      break;
     default:
       {
         printf ("<expr?> %d\n", e.type);

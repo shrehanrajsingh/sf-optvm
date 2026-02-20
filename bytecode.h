@@ -2,6 +2,7 @@
 #define BYTECODE_H
 
 #include "arith.h"
+#include "cl.h"
 #include "const.h"
 #include "expr.h"
 #include "header.h"
@@ -30,6 +31,7 @@ typedef enum OpcodeType
   OP_LOAD_BUILDCLASS,
   OP_LOAD_BUILDCLASS_END,
   OP_LOAD_NAME,
+  OP_DOT_ACCESS,
   //   OP_STACK_POP,
   //   OP_STACK_PUSH,
   OP_RETURN

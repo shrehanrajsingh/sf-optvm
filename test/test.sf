@@ -1,4 +1,7 @@
-while 1
-    class Test
-        a = 20
-        putln (a)
+class Test
+    a = 20
+    b = 30
+    c = 40
+    d = 50
+
+putln (Test.d)

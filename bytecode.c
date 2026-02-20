@@ -2,6 +2,8 @@
 
 static const_t __sf_none_obj = (const_t){ .type = CONST_NONE };
 
+obj_t *container_access (obj_t *, char *);
+
 SF_API vm_t
 sf_vm_new ()
 {
@@ -29,6 +31,7 @@ sf_vm_new ()
   v.meta.slot = SF_VM_SLOT_GLOBAL;
   v.meta.g_slot = 0;
   v.meta.l_slot = 0;
+  v.meta.n_slot = 0;
 
   for (int i = 0; i < v.globals_cap; i++)
     v.globals[i] = NULL;
@@ -100,6 +103,9 @@ sf_vm_print_inst (instr_t i)
       break;
     case OP_STORE_NAME:
       printf ("OP_STORE_NAME: '%s'", i.c);
+      break;
+    case OP_DOT_ACCESS:
+      printf ("OP_DOT_ACCESS: '%s'", i.c);
       break;
     // case OP_STACK_POP:
     //   fputs ("OP_STACK_POP:", stdout);
@@ -285,7 +291,9 @@ start:;
 
             if (fr->n.vals[i.a] != NULL)
               DR (fr->n.vals[i.a]);
+
             fr->n.vals[i.a] = val;
+            fr->n.names[i.a] = i.c;
           }
           break;
 
@@ -760,7 +768,51 @@ start:;
 
         case OP_LOAD_BUILDCLASS_END:
           {
-            sf_vm_popframe (vm);
+            frame_t f = vm->frames[--vm->fp];
+            assert (f.type == FRAME_NAME);
+
+            class_t *cl = sf_class_new ();
+
+            cl->svl = f.n.nvl;
+            cl->svc = f.n.nvl;
+
+            // cl->slots = SFMALLOC (sizeof (*cl->slots));
+            // cl->vals = SFMALLOC (sizeof (*cl->vals));
+
+            // for (size_t j = 0; j < f.n.nvl; j++)
+            //   {
+            //     cl->vals[j] = f.n.vals[j];
+            //     cl->slots[j] = f.n.names[j];
+            //   }
+
+            cl->slots = f.n.names;
+            cl->vals = f.n.vals;
+            cl->name = vm->insts[i.a].c;
+
+            obj_t *o = sf_objstore_req ();
+            o->type = OBJ_CLASS;
+            o->v.o_class.v = cl;
+
+            push (vm, o);
+            IR (o);
+          }
+          break;
+
+        case OP_DOT_ACCESS:
+          {
+            obj_t *l = pop (vm);
+            char *name = i.c;
+
+            obj_t *o = container_access (l, name);
+
+            if (o == NULL)
+              {
+                printf ("member '%s' does not exist.\n", name);
+                exit (EXIT_FAILURE);
+              }
+
+            push (vm, o);
+            IR (o);
           }
           break;
 
@@ -910,4 +962,26 @@ sf_vm_framefree (frame_t *f)
     default:
       break;
     }
+}
+
+obj_t *
+container_access (obj_t *o, char *name)
+{
+  switch (o->type)
+    {
+    case OBJ_CLASS:
+      {
+        class_t *c = o->v.o_class.v;
+
+        for (int i = 0; i < c->svl; i++)
+          if (!strcmp (c->slots[i], name))
+            return c->vals[i];
+      }
+      break;
+
+    default:
+      break;
+    }
+
+  return NULL;
 }

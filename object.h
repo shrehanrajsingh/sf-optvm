@@ -1,6 +1,7 @@
 #if !defined(OBJECT_H)
 #define OBJECT_H
 
+#include "cl.h"
 #include "const.h"
 #include "fun.h"
 #include "header.h"
@@ -11,6 +12,7 @@ enum ObjectType
 {
   OBJ_CONST,
   OBJ_FUNC,
+  OBJ_CLASS,
 };
 
 typedef struct object_s
@@ -30,6 +32,12 @@ typedef struct object_s
       fun_t *v;
 
     } o_fun;
+
+    struct
+    {
+      class_t *v;
+
+    } o_class;
 
   } v;
 

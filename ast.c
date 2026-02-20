@@ -1089,6 +1089,19 @@ sf_expr_gen (token_t *start, token_t *end)
                 e = re;
                 goto end;
               }
+            else if (*op == '.')
+              {
+                assert (start->type == TOK_IDENTIFIER);
+
+                expr_t re;
+                re.type = EXPR_DOT_ACCESS;
+                re.v.e_dota.left = SFMALLOC (sizeof (*re.v.e_dota.left));
+                *re.v.e_dota.left = e;
+                re.v.e_dota.right = (char *)start->v.t_identifier.value;
+
+                e = re;
+                start++;
+              }
           }
           break;
 

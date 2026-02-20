@@ -55,6 +55,9 @@ makeop (char *op)
       break;
 
     case '!':
+    case '^':
+    case '&':
+    case '|':
       {
         if (op[1] == '=')
           op[2] = '\0';
@@ -73,6 +76,13 @@ makeop (char *op)
           }
         else
           op[1] = '\0';
+      }
+      break;
+
+    case '.':
+    case '~':
+      {
+        op[1] = '\0';
       }
       break;
 

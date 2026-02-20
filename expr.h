@@ -13,6 +13,7 @@ enum ExprType
   EXPR_ARITHMETIC,
   EXPR_FUNCALL,
   EXPR_CMP,
+  EXPR_DOT_ACCESS,
   EXPR_COUNT
 };
 
@@ -73,6 +74,12 @@ typedef struct __expr_s
       struct __expr_s *right;
 
     } e_cmp;
+
+    struct
+    {
+      struct __expr_s *left;
+      char *right;
+    } e_dota;
 
   } v;
 

@@ -3,47 +3,8 @@
 obj_t *
 sf_putln (obj_t *v)
 {
-  switch (v->type)
-    {
-    case OBJ_CONST:
-      {
-        switch (v->v.o_const.v.type)
-          {
-          case CONST_INT:
-            printf ("%d\n", v->v.o_const.v.v.c_int.v);
-            break;
-
-          case CONST_FLOAT:
-            printf ("%f\n", v->v.o_const.v.v.c_float.v);
-            break;
-
-          case CONST_BOOL:
-            puts (v->v.o_const.v.v.c_bool.v ? "true" : "false");
-            break;
-
-          case CONST_STRING:
-            puts (v->v.o_const.v.v.c_str.v);
-            break;
-
-          case CONST_NONE:
-            puts ("none");
-            break;
-
-          default:
-            break;
-          }
-      }
-      break;
-
-    case OBJ_FUNC:
-      {
-        printf ("<function '%p'>\n", v->v.o_fun.v);
-      }
-      break;
-
-    default:
-      break;
-    }
+  sf_obj_print (*v);
+  putchar ('\n');
 
   return NULL;
 }
@@ -51,48 +12,7 @@ sf_putln (obj_t *v)
 obj_t *
 sf_put (obj_t *v)
 {
-  switch (v->type)
-    {
-    case OBJ_CONST:
-      {
-        switch (v->v.o_const.v.type)
-          {
-          case CONST_INT:
-            printf ("%d", v->v.o_const.v.v.c_int.v);
-            break;
-
-          case CONST_FLOAT:
-            printf ("%f", v->v.o_const.v.v.c_float.v);
-            break;
-
-          case CONST_BOOL:
-            fputs (v->v.o_const.v.v.c_bool.v ? "true" : "false", stdout);
-            break;
-
-          case CONST_STRING:
-            fputs (v->v.o_const.v.v.c_str.v, stdout);
-            break;
-
-          case CONST_NONE:
-            fputs ("none", stdout);
-            break;
-
-          default:
-            break;
-          }
-      }
-      break;
-
-    case OBJ_FUNC:
-      {
-        printf ("<function '%p'>\n", v->v.o_fun.v);
-      }
-      break;
-
-    default:
-      break;
-    }
-
+  sf_obj_print (*v);
   return NULL;
 }
 
