@@ -1110,7 +1110,7 @@ sf_expr_gen (token_t *start, token_t *end)
         }
     }
 
-end:
+end:;
   expr_t *ee = SFMALLOC (sizeof (*ee));
   *ee = e;
   return ee;
