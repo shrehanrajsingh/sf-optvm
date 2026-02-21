@@ -13,6 +13,8 @@ enum ObjectType
   OBJ_CONST,
   OBJ_FUNC,
   OBJ_CLASS,
+  OBJ_COBJ,
+  OBJ_HFF, /* half function */
 };
 
 typedef struct object_s
@@ -38,6 +40,20 @@ typedef struct object_s
       class_t *v;
 
     } o_class;
+
+    struct
+    {
+      cobj_t *v;
+
+    } o_cobj;
+
+    struct
+    {
+      struct object_s *f;
+      struct object_s **args;
+      size_t al;
+
+    } o_hff;
 
   } v;
 

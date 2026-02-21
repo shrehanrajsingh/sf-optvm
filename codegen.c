@@ -435,6 +435,17 @@ sf_vm_gen_bytecode (vm_t *vm, StmtSM *smt)
                                              .c = (char *)name->v.e_var.v });
                 }
                 break;
+              case EXPR_DOT_ACCESS:
+                {
+                  sf_vm_gen_b_fromexpr (vm, *name->v.e_dota.left);
+
+                  add_inst (vm,
+                            (instr_t){ .op = OP_STORE_NAME,
+                                       .a = 0,
+                                       .b = 1,
+                                       .c = (char *)name->v.e_dota.right });
+                }
+                break;
 
               default:
                 break;

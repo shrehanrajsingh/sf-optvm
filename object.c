@@ -1,7 +1,8 @@
 #include "object.h"
 
 static obj_t **objstore = NULL;
-static const size_t OBJSTORE_CAP = 512;
+
+#define OBJSTORE_CAP (512)
 static size_t osc = OBJSTORE_CAP;
 static size_t osl = 0;
 
@@ -235,6 +236,14 @@ sf_obj_print (obj_t o)
       printf ("<class '%s'>", o.v.o_class.v->name);
       break;
 
+    case OBJ_COBJ:
+      printf ("<object '%s'>", o.v.o_cobj.v->p->name);
+      break;
+
+    case OBJ_HFF:
+      sf_obj_print (*o.v.o_hff.f);
+      break;
+
     default:
       printf ("<object:unknown>");
       break;
@@ -280,6 +289,9 @@ sf_obj_isfalse (obj_t o)
       break;
 
     case OBJ_FUNC:
+    case OBJ_CLASS:
+    case OBJ_COBJ:
+    case OBJ_HFF:
       r = 0;
       break;
 

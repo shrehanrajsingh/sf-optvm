@@ -194,7 +194,16 @@ _exec_vardecl (const char *name, expr_t *val, mod_t *mod)
 void
 _exec_funcall (expr_t *name, expr_t **args, size_t argc, mod_t *mod)
 {
+#if defined(__STDC_VERSION__)
+#if __STDC_VERSION__ >= 202311L
   static thread_local mod_t *__m = NULL;
+#else
+  static mod_t *__m = NULL;
+#endif
+#else
+  static mod_t *__m = NULL;
+#endif
+
   obj_t *o_name = sf_parser_eval_expr (name, mod);
 
   if (__m == NULL)
