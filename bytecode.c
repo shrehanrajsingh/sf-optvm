@@ -235,7 +235,11 @@ start:;
             // IR (val);
 
             if (vm->globals[i.a] != NULL)
-              DR (vm->globals[i.a]);
+              {
+                // D (sf_obj_print (*vm->globals[i.a]));
+                // D (printf ("%d\n", vm->globals[i.a]->meta.ref_count));
+                DR (vm->globals[i.a]);
+              }
             vm->globals[i.a] = val;
 
             // push (vm, val);
@@ -304,6 +308,9 @@ start:;
                 obj_t *vv = pop (vm);
 
                 container_set (val, i.c, vv);
+                // D (sf_obj_print (*val));
+                // D (printf ("%d\n", val->meta.ref_count));
+                DR (val);
               }
           }
           break;
@@ -783,6 +790,10 @@ start:;
                           fr->pop_ret_val = 1;
                         }
                     }
+
+                  /* resolve r-values */
+                  IR (_init_method);
+                  DR (_init_method);
                 }
                 break;
 
@@ -1059,6 +1070,7 @@ start:;
 
             push (vm, o);
             IR (o);
+            DR (l);
           }
           break;
 
@@ -1253,7 +1265,7 @@ container_access (obj_t *o, char *name)
               }
           }
 
-        if (r->type == OBJ_FUNC)
+        if (r != NULL && r->type == OBJ_FUNC)
           {
             obj_t *oj = sf_objstore_req ();
 
@@ -1263,8 +1275,8 @@ container_access (obj_t *o, char *name)
             oj->v.o_hff.al = 1;
             oj->v.o_hff.args = SFMALLOC (sizeof (*oj->v.o_hff.args));
             *oj->v.o_hff.args = o;
-
             IR (o);
+
             return oj;
           }
         else

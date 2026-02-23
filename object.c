@@ -154,6 +154,36 @@ sf_obj_free (obj_t *o)
       SFFREE (o->v.o_fun.v);
     }
 
+  if (o->type == OBJ_COBJ)
+    {
+      cobj_t *c = o->v.o_cobj.v;
+
+      if (c->vals != NULL)
+        {
+          for (size_t i = 0; i < c->svc; i++)
+            {
+              if (c->vals[i] != NULL)
+                {
+                  DR (c->vals[i]);
+                }
+            }
+        }
+
+      sf_cobj_free (c);
+    }
+
+  if (o->type == OBJ_HFF)
+    {
+      for (size_t i = 0; i < o->v.o_hff.al; i++)
+        {
+          DR (o->v.o_hff.args[i]);
+        }
+
+      if (o->v.o_hff.args != NULL)
+        SFFREE (o->v.o_hff.args);
+      // DR (o->v.o_hff.f);
+    }
+
   if (osfil >= osfic)
     {
       osfic += OBJSTORE_CAP;

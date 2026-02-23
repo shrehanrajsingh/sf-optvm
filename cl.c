@@ -29,5 +29,11 @@ sf_cobj_new (class_t *p)
 SF_API void
 sf_cobj_free (cobj_t *c)
 {
+  if (c->slots != NULL)
+    SFFREE (c->slots);
+
+  if (c->vals != NULL)
+    SFFREE (c->vals);
+
   SFFREE (c);
 }
