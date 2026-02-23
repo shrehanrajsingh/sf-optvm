@@ -81,6 +81,7 @@ makeop (char *op)
 
     case '.':
     case '~':
+    case ',':
       {
         op[1] = '\0';
       }

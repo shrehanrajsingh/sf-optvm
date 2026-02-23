@@ -460,7 +460,10 @@ sf_vm_gen_bytecode (vm_t *vm, StmtSM *smt)
             expr_t *name = s->v.s_funcall.name;
 
             for (size_t i = 0; i < argc; i++)
-              sf_vm_gen_b_fromexpr (vm, *args[i]);
+              {
+                sf_expr_print (*args[i]);
+                sf_vm_gen_b_fromexpr (vm, *args[i]);
+              }
 
             sf_vm_gen_b_fromexpr (vm, *name);
             add_inst (vm, (instr_t){

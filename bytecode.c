@@ -748,6 +748,41 @@ start:;
                     }
                   // else
                   //   sf_cobj_free (co);
+
+                  obj_t *_init_method = container_access (o, "_init");
+                  if (_init_method != NULL)
+                    {
+                      assert (_init_method->type == OBJ_HFF);
+                      obj_t *hfo = _init_method->v.o_hff.f;
+
+                      assert (hfo->type == OBJ_FUNC);
+                      fun_t *f = hfo->v.o_fun.v;
+
+                      if (f->type == FUN_CODED)
+                        {
+                          assert (f->argl == al + 1);
+                          size_t lp = f->v.coded.lp;
+
+                          for (size_t i = 0; i < al; i++)
+                            {
+                              push (vm, args[i]);
+                              // IR (args[i]);
+                            }
+
+                          push (vm, o);
+                          IR (o);
+
+                          frame_t frt = sf_frame_new_local ();
+                          frt.return_ip = vm->ip + 1;
+                          // D (printf ("%d\n", fr.return_ip));
+                          frt.stack_base = vm->sp;
+
+                          sf_vm_addframe (vm, frt);
+                          fr = &vm->frames[vm->fp - 1];
+                          vm->ip = lp - 1;
+                          fr->pop_ret_val = 1;
+                        }
+                    }
                 }
                 break;
 

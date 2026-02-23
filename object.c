@@ -241,6 +241,7 @@ sf_obj_print (obj_t o)
       break;
 
     case OBJ_HFF:
+      D (printf ("[hff]"));
       sf_obj_print (*o.v.o_hff.f);
       break;
 

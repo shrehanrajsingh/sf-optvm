@@ -243,12 +243,12 @@ sf_ast_gen (TokenSM *smt)
                 while (smt_front->type != TOK_EOF)
                   {
                     t = *smt_front++;
+                    // D (sf_token_print (t));
 
                     switch (t.type)
                       {
                       case TOK_OPERATOR:
                         {
-                          //   sf_token_print (t);
                           const char *op = t.v.t_operator.value;
 
                           if (*op == ')' && !gb)
@@ -285,6 +285,8 @@ sf_ast_gen (TokenSM *smt)
                                   args = SFREALLOC (
                                       args, (argc + 1) * sizeof (*args));
                                 }
+
+                              D (sf_token_print (*left));
 
                               args[argc++] = sf_expr_gen (left, smt_front - 1);
                               left = smt_front;
@@ -1017,7 +1019,7 @@ sf_expr_gen (token_t *start, token_t *end)
 
                         if (*op == ',' && !gb)
                           {
-                            args[al++] = sf_expr_gen (left, start - 2);
+                            args[al++] = sf_expr_gen (left, start - 1);
                             left = start;
                           }
 

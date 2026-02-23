@@ -54,7 +54,7 @@ sf_expr_print (expr_t e)
 
         for (size_t i = 0; i < e.v.e_funcall.al; i++)
           {
-            printf ("ARG (%lu): ", i);
+            printf ("\nARG (%lu): ", i);
             sf_expr_print (*e.v.e_funcall.args[i]);
           }
       }
