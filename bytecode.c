@@ -130,7 +130,7 @@ sf_vm_print_b (vm_t *vm)
 {
   for (int i = 0; i < vm->inst_len; i++)
     {
-      printf ("(%d) ", i);
+      printf ("(%d %p) ", i, &vm->insts[i]);
       sf_vm_print_inst (vm->insts[i]);
     }
 }
@@ -176,8 +176,7 @@ sf_vm_exec_single_frame (vm_t *vm)
 start:;
   while (1)
     {
-      // D (printf ("%lu", vm->ip));
-
+      // D (printf ("%lu\n", vm->ip));
       switch (i.op)
         {
         case OP_RETURN:
@@ -398,6 +397,7 @@ start:;
             while (al < argc)
               {
                 args[al++] = pop (vm);
+                // sf_obj_print (*args[al - 1]);
                 // IR (args[al++]);
               }
 
@@ -1035,6 +1035,7 @@ start:;
 
             nf.return_ip = i.a; /* buildclass_end location */
             sf_vm_addframe (vm, nf);
+
             vm->ip++;
             sf_vm_exec_single_frame (vm);
           }
@@ -1059,8 +1060,16 @@ start:;
             //     cl->slots[j] = f.n.names[j];
             //   }
 
-            cl->slots = f.n.names;
-            cl->vals = f.n.vals;
+            cl->slots = SFMALLOC (f.n.nvl * sizeof (*cl->slots));
+            cl->vals = SFMALLOC (f.n.nvl * sizeof (*cl->vals));
+
+            for (size_t j = 0; j < f.n.nvl; j++)
+              {
+                cl->slots[j] = SFSTRDUP (f.n.names[j]);
+                cl->vals[j] = f.n.vals[j];
+                IR (f.n.vals[j]);
+              }
+
             cl->name = vm->insts[i.a].c;
 
             obj_t *o = sf_objstore_req ();
@@ -1070,9 +1079,7 @@ start:;
             push (vm, o);
             IR (o);
 
-            push (vm, NULL); /* for saving from pop_retval */
-
-            goto end;
+            goto end2;
           }
           break;
 
@@ -1098,10 +1105,13 @@ start:;
         case OP_LOAD_ARRAY:
           {
             array_t *ar = sf_array_withsize (i.a);
-            for (int j = i.a - 1; j >= 0; j--)
-              {
-                ar->vals[j] = pop (vm);
-              }
+            // for (int j = i.a - 1; j >= 0; j--)
+            //   {
+            //     ar->vals[c++] = pop (vm);
+            //   }
+
+            for (int j = i.a - 1; j > -1; j--)
+              ar->vals[j] = pop (vm);
 
             obj_t *o = sf_objstore_req ();
             o->type = OBJ_ARRAY;
@@ -1120,6 +1130,9 @@ start:;
             obj_t *o = sqr_access (par, idx);
             push (vm, o);
             IR (o);
+
+            DR (idx, vm);
+            DR (par, vm);
           }
           break;
 
@@ -1131,14 +1144,15 @@ start:;
     }
 
 end:;
-  vm->ip = fr->return_ip;
-
   if (fr->pop_ret_val)
     {
       obj_t *p = pop (vm);
       if (p != NULL)
         DR (p, vm);
     }
+
+end2:;
+  vm->ip = fr->return_ip;
 }
 
 SF_API void
@@ -1193,10 +1207,36 @@ end:;
       for (size_t i = 0; i < vm->globals_cap; i++)
         {
           if (vm->globals[i] != NULL)
-            DR (vm->globals[i], vm);
+            {
+              if (vm->globals[i]->type == OBJ_CLASS)
+                {
+                  continue;
+                }
+
+              if (vm->globals[i]->type == OBJ_COBJ)
+                {
+                  cobj_t *c = vm->globals[i]->v.o_cobj.v;
+
+                  // D (printf ("%d\n", c->p->svl));
+
+                  // for (int i = 0; i < c->p->svl; i++)
+                  //   D (printf ("%s\n", c->p->slots[i]));
+                  DR (vm->globals[i], vm);
+                  vm->globals[i] = NULL;
+                }
+            }
+        }
+
+      for (size_t i = 0; i < vm->globals_cap; i++)
+        {
+          if (vm->globals[i] != NULL)
+            {
+              DR (vm->globals[i], vm);
+            }
         }
 
       SFFREE (vm->globals);
+      vm->globals_cap = 0;
     }
   else if (vm->fp > 1)
     {
@@ -1266,27 +1306,41 @@ sf_vm_popframe (vm_t *vm)
   //   if (f->locals[i] != NULL)
   //     DR (f->locals[i], vm);
 
-  sf_vm_framefree (&vm->frames[--vm->fp], vm);
+  frame_t *fr = &vm->frames[vm->fp - 1];
+  sf_vm_framefree (fr, vm);
+  --vm->fp;
 }
 
 SF_API void
 sf_vm_framefree (frame_t *f, vm_t *vm)
 {
+  // D (printf ("%p", f));
   // D (printf ("%lu\n", f->locals_count));
 
   switch (f->type)
     {
     case FRAME_LOCAL:
       {
+        // here;
+        // if (f->l.locals != NULL)
         for (int i = 0; i < f->l.locals_cap; i++)
           {
             if (f->l.locals[i] != NULL)
               {
+                // sf_obj_print (*f->l.locals[i]);
                 DR (f->l.locals[i], vm);
               }
           }
 
-        SFFREE (f->l.locals);
+        // here;
+
+        // if (f->l.locals != NULL)
+        {
+          SFFREE (f->l.locals);
+          // f->l.locals = NULL;
+          // f->l.locals_count = 0;
+          // f->l.locals_cap = 0;
+        }
       }
       break;
 
@@ -1337,7 +1391,7 @@ container_access (obj_t *o, char *name)
         /* check cobj dict */
         for (int i = 0; i < c->svl; i++)
           {
-            if (!strcmp (c->slots[i], name))
+            if (c->slots[i] != NULL && !strcmp (c->slots[i], name))
               {
                 r = c->vals[i];
                 break;
@@ -1349,7 +1403,7 @@ container_access (obj_t *o, char *name)
             /* check class */
             for (int i = 0; i < c->p->svl; i++)
               {
-                if (!strcmp (c->p->slots[i], name))
+                if (c->p->slots[i] != NULL && !strcmp (c->p->slots[i], name))
                   {
                     r = c->p->vals[i];
                     break;

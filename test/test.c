@@ -116,9 +116,11 @@ test3 ()
 
   StmtSM *stt = sf_ast_gen (smt);
 
+  here;
+  D (printf ("stmt len: %lu\n", stt->vl));
   for (int i = 0; i < stt->vl; i++)
     sf_stmt_print (stt->vals[i]);
-
+  here;
   vm_t vm = sf_vm_new ();
 
   {

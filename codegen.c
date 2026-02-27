@@ -489,7 +489,7 @@ sf_vm_gen_bytecode (vm_t *vm, StmtSM *smt)
 
             for (size_t i = 0; i < argc; i++)
               {
-                sf_expr_print (*args[i]);
+                // sf_expr_print (*args[i]);
                 sf_vm_gen_b_fromexpr (vm, *args[i]);
               }
 
@@ -518,7 +518,7 @@ sf_vm_gen_bytecode (vm_t *vm, StmtSM *smt)
                               .b = 0,
                           });
 
-            instr_t *p = &vm->insts[vm->inst_len - 1];
+            size_t pl = vm->inst_len - 1;
 
             StmtSM smt;
             smt.vals = body;
@@ -533,8 +533,12 @@ sf_vm_gen_bytecode (vm_t *vm, StmtSM *smt)
                               .b = 0,
                           });
 
-            instr_t *q = &vm->insts[vm->inst_len - 1];
-            p->a = vm->inst_len;
+            size_t ql = vm->inst_len - 1;
+            vm->insts[pl] = (instr_t){
+              .op = OP_JUMP_IF_FALSE,
+              .a = vm->inst_len,
+              .b = 0,
+            };
 
             if (ebl)
               {
@@ -545,7 +549,11 @@ sf_vm_gen_bytecode (vm_t *vm, StmtSM *smt)
                 vm->inst_len--; // eat return
               }
 
-            q->a = vm->inst_len;
+            vm->insts[ql] = (instr_t){
+              .op = OP_JUMP,
+              .a = vm->inst_len,
+              .b = 0,
+            };
           }
           break;
 
@@ -567,22 +575,40 @@ sf_vm_gen_bytecode (vm_t *vm, StmtSM *smt)
                               .b = 0,
                           });
 
-            instr_t *p = &vm->insts[vm->inst_len - 1];
+            size_t il = vm->inst_len - 1;
+            /**
+             * ! DO NOT TAKE REFERENCE OF LAST INSTRUCTION
+             * ! IF vm->insts IS REALLOCED THEN REFERENCES BECOME
+             * ! MEANINGLESS
+             */
 
             StmtSM smt;
             smt.vals = body;
             smt.vc = smt.vl = bl;
 
+            here;
+            for (int i = 0; i < bl; i++)
+              sf_stmt_print (body[i]);
+            here;
+
             sf_vm_gen_bytecode (vm, &smt);
+
             vm->inst_len--; // eat return
 
+            // D (printf ("%d\n", vl));
             add_inst (vm, (instr_t){
                               .op = OP_JUMP,
                               .a = vl,
                               .b = 0,
                           });
 
-            p->a = vm->inst_len;
+            // D (printf ("%d\n", vm->inst_len));
+            vm->insts[il] = (instr_t){
+              .op = OP_JUMP_IF_FALSE,
+              .a = vm->inst_len,
+              .b = 0,
+            };
+            // D (printf ("%d %d\n", p->a, p->op));
           }
           break;
 
@@ -630,7 +656,7 @@ sf_vm_gen_bytecode (vm_t *vm, StmtSM *smt)
                               .b = 0,
                           });
 
-            instr_t *p = &vm->insts[vm->inst_len - 1];
+            size_t pl = vm->inst_len - 1;
             size_t ql = vm->inst_len;
 
             for (size_t i = 0; i < vltc; i++)
@@ -647,7 +673,11 @@ sf_vm_gen_bytecode (vm_t *vm, StmtSM *smt)
 
             pop_ht (vm);
 
-            p->a = vm->inst_len;
+            vm->insts[pl] = (instr_t){
+              .op = OP_JUMP,
+              .a = vm->inst_len,
+              .b = 0,
+            };
 
             add_inst (vm, (instr_t){
                               .op = OP_LOAD_FUNC_CODED,
@@ -709,7 +739,6 @@ sf_vm_gen_bytecode (vm_t *vm, StmtSM *smt)
                           });
 
             size_t il = vm->inst_len - 1;
-            instr_t *p = &vm->insts[il];
 
             StmtSM csm;
             csm.vals = body;
@@ -731,13 +760,16 @@ sf_vm_gen_bytecode (vm_t *vm, StmtSM *smt)
 
             add_inst (vm, (instr_t){
                               .op = OP_LOAD_BUILDCLASS_END,
-                              .a = 0, /* the corresponding LOAD_BUILDCLASS */
+                              .a = il, /* the corresponding LOAD_BUILDCLASS */
                               .b = 0,
                           });
 
-            instr_t *q = &vm->insts[vm->inst_len - 1];
-            p->a = vm->inst_len - 1;
-            q->a = il;
+            vm->insts[il] = (instr_t){
+              .op = OP_LOAD_BUILDCLASS,
+              .a = vm->inst_len - 1, /* the corresponding LOAD_BUILDEND */
+              .b = 0,
+              .c = (char *)name,
+            };
 
             if (vm->meta.slot == SF_VM_SLOT_GLOBAL)
               add_inst (vm, (instr_t){

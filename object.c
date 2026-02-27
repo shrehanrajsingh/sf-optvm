@@ -159,25 +159,70 @@ sf_obj_free (obj_t *o, vm_t *vm)
     {
       cobj_t *c = o->v.o_cobj.v;
 
-      // if (c->destructor_called)
-      {
-        if (c->vals != NULL)
-          {
-            for (size_t i = 0; i < c->svc; i++)
-              {
-                if (c->vals[i] != NULL)
-                  {
-                    DR (c->vals[i], vm);
-                  }
-              }
-          }
+    l1:;
+      if (c->destructor_called)
+        {
+          if (c->vals != NULL)
+            {
+              for (size_t i = 0; i < c->svc; i++)
+                {
+                  if (c->vals[i] != NULL)
+                    {
+                      DR (c->vals[i], vm);
+                    }
+                }
+            }
 
-        sf_cobj_free (c);
-      }
-      /* else
+          sf_cobj_free (c);
+        }
+      else
         {
           c->destructor_called = 1;
-        } */
+
+          obj_t *_kill_method = container_access (o, "_kill");
+          // D (printf ("%d\n", _kill_method == NULL));
+
+          if (_kill_method != NULL)
+            {
+              assert (_kill_method->type == OBJ_HFF);
+              obj_t *o_f = _kill_method->v.o_hff.f;
+
+              // sf_obj_print (*o_f);
+              assert (o_f->type == OBJ_FUNC);
+              fun_t *f = o_f->v.o_fun.v;
+
+              if (o_f->type == FUN_CODED)
+                {
+                  assert (f->argl == 1); /* only self */
+                  size_t lp = f->v.coded.lp;
+
+                  IR (o);
+                  if (vm->sp >= vm->stack_cap)
+                    {
+                      vm->stack_cap += SF_VM_STACK_CAP;
+                      vm->stack = SFREALLOC (
+                          vm->stack, vm->stack_cap * sizeof (*vm->stack));
+                    }
+
+                  vm->stack[vm->sp++] = o;
+
+                  frame_t fr = sf_frame_new_local ();
+                  fr.return_ip = vm->ip;
+                  fr.stack_base = vm->sp;
+                  fr.pop_ret_val = 1;
+
+                  vm->ip = lp;
+
+                  // D (printf ("%d\n", vm->fp));
+                  sf_vm_addframe (vm, fr);
+                  // D (printf ("%d\n", vm->fp));
+                  sf_vm_exec_single_frame (vm);
+                  // D (printf ("%d\n", vm->fp));
+                  sf_vm_popframe (vm);
+                  // D (printf ("%d\n", vm->fp));
+                }
+            }
+        }
     }
 
   if (o->type == OBJ_HFF)
