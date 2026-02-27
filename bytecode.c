@@ -176,7 +176,6 @@ sf_vm_exec_single_frame (vm_t *vm)
 start:;
   while (1)
     {
-      fr = &vm->frames[vm->fp - 1];
       // D (printf ("%lu", vm->ip));
 
       switch (i.op)
@@ -543,19 +542,22 @@ start:;
                           }
 
                         frame_t frt = sf_frame_new_local ();
-                        frt.return_ip = vm->ip + 1;
+                        frt.return_ip = vm->ip;
                         // D (printf ("%d\n", fr.return_ip));
                         frt.stack_base = vm->sp;
 
-                        sf_vm_addframe (vm, frt);
-                        fr = &vm->frames[vm->fp - 1];
-                        vm->ip = lp - 1;
+                        // fr = &vm->frames[vm->fp - 1];
+                        vm->ip = lp;
 
                         if (i.b == 1)
-                          fr->pop_ret_val = 0; /* need return value */
+                          frt.pop_ret_val = 0; /* need return value */
                         else
-                          fr->pop_ret_val
+                          frt.pop_ret_val
                               = 1; /* dont need return value (stmt call) */
+
+                        sf_vm_addframe (vm, frt);
+                        sf_vm_exec_single_frame (vm);
+                        sf_vm_popframe (vm);
                       }
                       break;
 
@@ -724,19 +726,21 @@ start:;
                           }
 
                         frame_t frt = sf_frame_new_local ();
-                        frt.return_ip = vm->ip + 1;
+                        frt.return_ip = vm->ip;
                         // D (printf ("%d\n", fr.return_ip));
                         frt.stack_base = vm->sp;
 
-                        sf_vm_addframe (vm, frt);
-                        fr = &vm->frames[vm->fp - 1];
-                        vm->ip = lp - 1;
+                        vm->ip = lp;
 
                         if (i.b == 1)
-                          fr->pop_ret_val = 0; /* need return value */
+                          frt.pop_ret_val = 0; /* need return value */
                         else
-                          fr->pop_ret_val
+                          frt.pop_ret_val
                               = 1; /* dont need return value (stmt call) */
+
+                        sf_vm_addframe (vm, frt);
+                        sf_vm_exec_single_frame (vm);
+                        sf_vm_popframe (vm);
                       }
                       break;
 
@@ -787,14 +791,16 @@ start:;
                           IR (o);
 
                           frame_t frt = sf_frame_new_local ();
-                          frt.return_ip = vm->ip + 1;
+                          frt.return_ip = vm->ip;
                           // D (printf ("%d\n", fr.return_ip));
                           frt.stack_base = vm->sp;
+                          frt.pop_ret_val = 1;
 
                           sf_vm_addframe (vm, frt);
-                          fr = &vm->frames[vm->fp - 1];
-                          vm->ip = lp - 1;
-                          fr->pop_ret_val = 1;
+                          vm->ip = lp;
+
+                          sf_vm_exec_single_frame (vm);
+                          sf_vm_popframe (vm);
                         }
                       else if (f->type == FUN_NATIVE)
                         {
@@ -1029,14 +1035,14 @@ start:;
 
             nf.return_ip = i.a; /* buildclass_end location */
             sf_vm_addframe (vm, nf);
-
-            fr = &vm->frames[vm->fp - 1];
+            vm->ip++;
+            sf_vm_exec_single_frame (vm);
           }
           break;
 
         case OP_LOAD_BUILDCLASS_END:
           {
-            frame_t f = vm->frames[--vm->fp];
+            frame_t f = vm->frames[vm->fp - 1];
             assert (f.type == FRAME_NAME);
 
             class_t *cl = sf_class_new ();
@@ -1063,6 +1069,10 @@ start:;
 
             push (vm, o);
             IR (o);
+
+            push (vm, NULL); /* for saving from pop_retval */
+
+            goto end;
           }
           break;
 
@@ -1122,6 +1132,13 @@ start:;
 
 end:;
   vm->ip = fr->return_ip;
+
+  if (fr->pop_ret_val)
+    {
+      obj_t *p = pop (vm);
+      if (p != NULL)
+        DR (p, vm);
+    }
 }
 
 SF_API void
@@ -1138,954 +1155,9 @@ sf_vm_exec_frame_top (vm_t *vm)
     }
 
 start:;
-  while (1)
-    {
-      fr = &vm->frames[vm->fp - 1];
-      // D (printf ("%lu", vm->ip));
-
-      switch (i.op)
-        {
-        case OP_RETURN:
-          {
-            obj_t *o = NULL;
-            if (i.a == 1)
-              {
-                /* user wrote a return statement */
-              }
-            else
-              push (vm, o = sf_objstore_req_forconst (&__sf_none_obj));
-
-            if (o != NULL)
-              IR (o);
-
-            goto end;
-          }
-          break;
-
-        case OP_LOAD_CONST:
-          {
-            const_t d = vm->map_consts[i.a];
-
-            obj_t *d_obj = sf_objstore_req_forconst (&d);
-
-            if (d_obj == NULL)
-              {
-                d_obj = sf_objstore_req ();
-                d_obj->type = OBJ_CONST;
-                d_obj->v.o_const.v = d;
-              }
-
-            IR (d_obj);
-            push (vm, d_obj);
-          }
-          break;
-
-        case OP_JUMP_IF_FALSE:
-          {
-            obj_t *p = pop (vm);
-
-            if (sf_obj_isfalse (*p))
-              vm->ip = i.a - 1;
-
-            DR (p, vm);
-          }
-          break;
-
-        case OP_JUMP:
-          {
-            vm->ip = i.a - 1;
-          }
-          break;
-
-        case OP_STORE:
-          {
-            obj_t *val = pop (vm);
-            // IR (val);
-            // sf_obj_print (*val);
-            // D (printf ("%d\n", val->meta.ref_count));
-
-            if (vm->globals[i.a] != NULL)
-              {
-                // D (sf_obj_print (*vm->globals[i.a]));
-                // D (printf ("%d\n", vm->globals[i.a]->meta.ref_count));
-                DR (vm->globals[i.a], vm);
-              }
-            vm->globals[i.a] = val;
-
-            // push (vm, val);
-          }
-          break;
-
-        case OP_STORE_FAST:
-          {
-            obj_t *val = pop (vm);
-            // IR (val);
-
-            if (i.a >= fr->l.locals_cap)
-              {
-                fr->l.locals_cap += SF_FRAME_LOCALS_CAP;
-
-                fr->l.locals = SFREALLOC (
-                    fr->l.locals, fr->l.locals_cap * sizeof (*fr->l.locals));
-
-                for (size_t j = fr->l.locals_count; j < fr->l.locals_cap; j++)
-                  fr->l.locals[j] = NULL;
-              }
-
-            if (i.a >= fr->l.locals_count)
-              fr->l.locals_count = i.a + 1;
-
-            if (fr->l.locals[i.a] != NULL)
-              DR (fr->l.locals[i.a], vm);
-            fr->l.locals[i.a] = val;
-
-            // push (vm, val);
-          }
-          break;
-
-        case OP_STORE_NAME:
-          {
-            obj_t *val = pop (vm);
-
-            if (i.b == 0)
-              {
-                if (i.a >= fr->n.nvc)
-                  {
-                    fr->n.nvc += SF_FRAME_LOCALS_CAP;
-
-                    fr->n.names = SFREALLOC (
-                        fr->n.names, fr->n.nvc * sizeof (*fr->n.names));
-
-                    fr->n.vals = SFREALLOC (fr->n.vals,
-                                            fr->n.nvc * sizeof (*fr->n.vals));
-
-                    for (size_t j = fr->n.nvl; j < fr->n.nvc; j++)
-                      fr->n.vals[j] = NULL;
-                  }
-
-                if (i.a >= fr->n.nvl)
-                  fr->n.nvl = i.a + 1;
-
-                if (fr->n.vals[i.a] != NULL)
-                  DR (fr->n.vals[i.a], vm);
-
-                fr->n.vals[i.a] = val;
-                fr->n.names[i.a] = i.c;
-              }
-            else if (i.b == 1)
-              {
-                /* pop from stack again, val is now the key */
-                obj_t *vv = pop (vm);
-
-                container_set (val, i.c, vv, vm);
-                // D (sf_obj_print (*val));
-                // D (printf ("%d\n", val->meta.ref_count));
-                DR (val, vm);
-              }
-          }
-          break;
-
-        case OP_LOAD:
-          {
-            obj_t *o = NULL;
-            push (vm, o = vm->globals[i.a]);
-
-            if (o != NULL)
-              IR (o);
-          }
-          break;
-
-        case OP_LOAD_NAME:
-          {
-            obj_t *o = NULL;
-            push (vm, o = fr->n.vals[i.a]);
-
-            if (o != NULL)
-              IR (o);
-          }
-          break;
-
-        case OP_LOAD_FAST:
-          {
-            obj_t *o = NULL;
-
-            if (i.a >= fr->l.locals_cap)
-              {
-                fr->l.locals_cap += SF_FRAME_LOCALS_CAP;
-
-                fr->l.locals = SFREALLOC (
-                    fr->l.locals, fr->l.locals_cap * sizeof (*fr->l.locals));
-              }
-
-            if (i.a >= fr->l.locals_count)
-              fr->l.locals_count = i.a + 1;
-
-            if (i.b == 0)
-              push (vm, o = fr->l.locals[i.a]);
-            else
-              {
-                /* number of levels to go up is less than number of frames */
-                assert (i.b < vm->fp);
-
-                push (vm, o = vm->frames[i.b].l.locals[i.a]);
-              }
-
-            if (o != NULL)
-              IR (o);
-          }
-          break;
-
-        case OP_LOAD_FUNC_CODED:
-          {
-            obj_t *o = sf_objstore_req ();
-            o->type = OBJ_FUNC;
-            o->v.o_fun.v = SFMALLOC (sizeof (fun_t));
-            o->v.o_fun.v->type = FUN_CODED;
-            o->v.o_fun.v->v.coded.lp = i.a;
-            o->v.o_fun.v->argc = o->v.o_fun.v->argl = i.b;
-
-            IR (o);
-            push (vm, o);
-          }
-          break;
-
-        case OP_CALL:
-          {
-            size_t argc = i.a;
-            obj_t *name = pop (vm);
-
-            // IR (name);
-
-            obj_t *args[64];
-            size_t al = 0;
-
-            while (al < argc)
-              {
-                args[al++] = pop (vm);
-                // IR (args[al++]);
-              }
-
-            switch (name->type)
-              {
-              case OBJ_FUNC:
-                {
-                  fun_t *f = name->v.o_fun.v;
-                  assert (f->argl == argc);
-
-                  switch (f->type)
-                    {
-                    case FUN_NATIVE:
-                      {
-                        switch (f->v.native.nf_type)
-                          {
-                          case NF_ARG_1:
-                            {
-                              obj_t *r = f->v.native.v.f_onearg (args[0]);
-
-                              if (r != NULL)
-                                {
-                                  if (i.b != 1)
-                                    {
-                                      DR (r, vm);
-                                    }
-                                  else
-                                    {
-                                      push (vm, r);
-                                    }
-                                }
-                              else
-                                {
-                                  if (i.b == 1)
-                                    {
-                                      obj_t *o = sf_objstore_req_forconst (
-                                          &__sf_none_obj);
-
-                                      push (vm, o);
-                                    }
-                                }
-                            }
-                            break;
-
-                          case NF_ARG_2:
-                            {
-                              obj_t *r
-                                  = f->v.native.v.f_twoarg (args[0], args[1]);
-
-                              if (r != NULL)
-                                {
-                                  if (i.b != 1)
-                                    {
-                                      DR (r, vm);
-                                    }
-                                  else
-                                    {
-                                      push (vm, r);
-                                    }
-                                }
-                              else
-                                {
-                                  if (i.b == 1)
-                                    {
-                                      obj_t *o = sf_objstore_req_forconst (
-                                          &__sf_none_obj);
-                                    }
-                                }
-                            }
-                            break;
-
-                          case NF_ARG_3:
-                            {
-                              obj_t *r = f->v.native.v.f_threearg (
-                                  args[0], args[1], args[2]);
-
-                              if (r != NULL)
-                                {
-                                  if (i.b != 1)
-                                    {
-                                      DR (r, vm);
-                                    }
-                                  else
-                                    {
-                                      push (vm, r);
-                                    }
-                                }
-                              else
-                                {
-                                  if (i.b == 1)
-                                    {
-                                      obj_t *o = sf_objstore_req_forconst (
-                                          &__sf_none_obj);
-                                    }
-                                }
-                            }
-                            break;
-
-                          case NF_ARG_ANY:
-                            {
-                              obj_t *r = f->v.native.v.f_anyarg (args, al);
-
-                              if (r != NULL)
-                                {
-                                  if (i.b != 1)
-                                    {
-                                      DR (r, vm);
-                                    }
-                                  else
-                                    {
-                                      push (vm, r);
-                                    }
-                                }
-                              else
-                                {
-                                  if (i.b == 1)
-                                    {
-                                      obj_t *o = sf_objstore_req_forconst (
-                                          &__sf_none_obj);
-                                    }
-                                }
-                            }
-                            break;
-
-                          default:
-                            break;
-                          }
-
-                        for (size_t i = 0; i < al; i++)
-                          DR (args[i], vm);
-                      }
-                      break;
-
-                    case FUN_CODED:
-                      {
-                        size_t lp = f->v.coded.lp;
-
-                        for (size_t i = 0; i < al; i++)
-                          {
-                            push (vm, args[i]);
-                            // IR (args[i]);
-                          }
-
-                        frame_t frt = sf_frame_new_local ();
-                        frt.return_ip = vm->ip + 1;
-                        // D (printf ("%d\n", fr.return_ip));
-                        frt.stack_base = vm->sp;
-
-                        sf_vm_addframe (vm, frt);
-                        fr = &vm->frames[vm->fp - 1];
-                        vm->ip = lp - 1;
-
-                        if (i.b == 1)
-                          fr->pop_ret_val = 0; /* need return value */
-                        else
-                          fr->pop_ret_val
-                              = 1; /* dont need return value (stmt call) */
-                      }
-                      break;
-
-                    default:
-                      break;
-                    }
-                }
-                break;
-
-              case OBJ_HFF:
-                {
-                  size_t hf_al = name->v.o_hff.al;
-                  obj_t **hf_args = name->v.o_hff.args;
-                  obj_t *hf_fo = name->v.o_hff.f;
-
-                  assert (hf_fo->type == OBJ_FUNC);
-                  fun_t *f = hf_fo->v.o_fun.v;
-
-                  // for (int j = al - 1; j > -1; j--)
-                  //   {
-                  //     args[j + hf_al] = args[j];
-                  //   }
-
-                  // for (size_t j = 0; j < hf_al; j++)
-                  //   {
-                  //     args[j] = hf_args[j];
-                  //   }
-
-                  for (size_t j = 0; j < hf_al; j++)
-                    args[al++] = hf_args[j];
-
-                  // al += hf_al;
-                  assert (al == f->argl);
-
-                  switch (f->type)
-                    {
-                    case FUN_NATIVE:
-                      {
-                        switch (f->v.native.nf_type)
-                          {
-                          case NF_ARG_1:
-                            {
-                              obj_t *r = f->v.native.v.f_onearg (args[0]);
-
-                              if (r != NULL)
-                                {
-                                  if (i.b != 1)
-                                    {
-                                      DR (r, vm);
-                                    }
-                                  else
-                                    {
-                                      push (vm, r);
-                                    }
-                                }
-                              else
-                                {
-                                  if (i.b == 1)
-                                    {
-                                      obj_t *o = sf_objstore_req_forconst (
-                                          &__sf_none_obj);
-
-                                      push (vm, o);
-                                    }
-                                }
-                            }
-                            break;
-
-                          case NF_ARG_2:
-                            {
-                              obj_t *r
-                                  = f->v.native.v.f_twoarg (args[0], args[1]);
-
-                              if (r != NULL)
-                                {
-                                  if (i.b != 1)
-                                    {
-                                      DR (r, vm);
-                                    }
-                                  else
-                                    {
-                                      push (vm, r);
-                                    }
-                                }
-                              else
-                                {
-                                  if (i.b == 1)
-                                    {
-                                      obj_t *o = sf_objstore_req_forconst (
-                                          &__sf_none_obj);
-                                    }
-                                }
-                            }
-                            break;
-
-                          case NF_ARG_3:
-                            {
-                              obj_t *r = f->v.native.v.f_threearg (
-                                  args[0], args[1], args[2]);
-
-                              if (r != NULL)
-                                {
-                                  if (i.b != 1)
-                                    {
-                                      DR (r, vm);
-                                    }
-                                  else
-                                    {
-                                      push (vm, r);
-                                    }
-                                }
-                              else
-                                {
-                                  if (i.b == 1)
-                                    {
-                                      obj_t *o = sf_objstore_req_forconst (
-                                          &__sf_none_obj);
-                                    }
-                                }
-                            }
-                            break;
-
-                          case NF_ARG_ANY:
-                            {
-                              obj_t *r = f->v.native.v.f_anyarg (args, al);
-
-                              if (r != NULL)
-                                {
-                                  if (i.b != 1)
-                                    {
-                                      DR (r, vm);
-                                    }
-                                  else
-                                    {
-                                      push (vm, r);
-                                    }
-                                }
-                              else
-                                {
-                                  if (i.b == 1)
-                                    {
-                                      obj_t *o = sf_objstore_req_forconst (
-                                          &__sf_none_obj);
-                                    }
-                                }
-                            }
-                            break;
-
-                          default:
-                            break;
-                          }
-
-                        for (size_t i = 0; i < al; i++)
-                          DR (args[i], vm);
-                      }
-                      break;
-
-                    case FUN_CODED:
-                      {
-                        size_t lp = f->v.coded.lp;
-
-                        for (size_t i = 0; i < al; i++)
-                          {
-                            push (vm, args[i]);
-                            // IR (args[i]);
-                          }
-
-                        frame_t frt = sf_frame_new_local ();
-                        frt.return_ip = vm->ip + 1;
-                        // D (printf ("%d\n", fr.return_ip));
-                        frt.stack_base = vm->sp;
-
-                        sf_vm_addframe (vm, frt);
-                        fr = &vm->frames[vm->fp - 1];
-                        vm->ip = lp - 1;
-
-                        if (i.b == 1)
-                          fr->pop_ret_val = 0; /* need return value */
-                        else
-                          fr->pop_ret_val
-                              = 1; /* dont need return value (stmt call) */
-                      }
-                      break;
-
-                    default:
-                      break;
-                    }
-                }
-                break;
-
-              case OBJ_CLASS:
-                {
-                  class_t *c = name->v.o_class.v;
-                  cobj_t *co = sf_cobj_new (c);
-
-                  obj_t *o = sf_objstore_req ();
-                  o->type = OBJ_COBJ;
-                  o->v.o_cobj.v = co;
-
-                  if (i.b == 1)
-                    {
-                      push (vm, o);
-                      IR (o);
-                    }
-                  // else
-                  //   sf_cobj_free (co);
-
-                  obj_t *_init_method = container_access (o, "_init");
-                  if (_init_method != NULL)
-                    {
-                      assert (_init_method->type == OBJ_HFF);
-                      obj_t *hfo = _init_method->v.o_hff.f;
-
-                      assert (hfo->type == OBJ_FUNC);
-                      fun_t *f = hfo->v.o_fun.v;
-
-                      if (f->type == FUN_CODED)
-                        {
-                          assert (f->argl == al + 1);
-                          size_t lp = f->v.coded.lp;
-
-                          for (size_t i = 0; i < al; i++)
-                            {
-                              push (vm, args[i]);
-                              // IR (args[i]);
-                            }
-
-                          push (vm, o);
-                          IR (o);
-
-                          frame_t frt = sf_frame_new_local ();
-                          frt.return_ip = vm->ip + 1;
-                          // D (printf ("%d\n", fr.return_ip));
-                          frt.stack_base = vm->sp;
-
-                          sf_vm_addframe (vm, frt);
-                          fr = &vm->frames[vm->fp - 1];
-                          vm->ip = lp - 1;
-                          fr->pop_ret_val = 1;
-                        }
-                      else if (f->type == FUN_NATIVE)
-                        {
-                          D (printf ("[TODO] native function as an _init"));
-                        }
-                    }
-
-                  /* resolve r-values */
-                  IR (_init_method);
-                  DR (_init_method, vm);
-                }
-                break;
-
-              default:
-                break;
-              }
-
-            DR (name, vm);
-
-            // for (size_t i = 0; i < al; i++)
-            //   {
-            //     DR (args[i], vm);
-            //   }
-          }
-          break;
-
-        case OP_ADD_1:
-          {
-            obj_t *p = pop (vm);
-            // IR (p);
-
-            if (p->type == OBJ_CONST && p->v.o_const.v.type == CONST_INT)
-              {
-                int r = p->v.o_const.v.v.c_int.v + 1;
-
-                obj_t *o = sf_objstore_req_forconst ((const_t *)(const_t[]){
-                    { .type = CONST_INT, .v.c_int.v = r } });
-
-                if (o == NULL)
-                  {
-                    o = sf_objstore_req ();
-                    o->type = OBJ_CONST;
-                    o->v.o_const.v.type = CONST_INT;
-                    o->v.o_const.v.v.c_int.v = r;
-                  }
-
-                push (vm, o);
-                IR (o);
-              }
-
-            DR (p, vm);
-          }
-          break;
-
-        case OP_ADD:
-          {
-            obj_t *l = pop (vm);
-            obj_t *r = pop (vm);
-
-            // IR (l);
-            // IR (r);
-
-            if (r->type == l->type && l->type == OBJ_CONST
-                && l->v.o_const.v.type == r->v.o_const.v.type
-                && l->v.o_const.v.type == CONST_INT)
-              {
-                int e = r->v.o_const.v.v.c_int.v + l->v.o_const.v.v.c_int.v;
-
-                obj_t *o = sf_objstore_req_forconst ((const_t *)(const_t[]){
-                    { .type = CONST_INT, .v.c_int.v = e } });
-
-                if (o == NULL)
-                  {
-                    o = sf_objstore_req ();
-                    o->type = OBJ_CONST;
-                    o->v.o_const.v.type = CONST_INT;
-                    o->v.o_const.v.v.c_int.v = e;
-                  }
-
-                push (vm, o);
-                IR (o);
-              }
-
-            DR (l, vm);
-            DR (r, vm);
-          }
-          break;
-
-        case OP_SUB:
-          {
-            obj_t *l = pop (vm);
-            obj_t *r = pop (vm);
-
-            // IR (l);
-            // IR (r);
-
-            if (r->type == l->type && l->type == OBJ_CONST
-                && l->v.o_const.v.type == r->v.o_const.v.type
-                && l->v.o_const.v.type == CONST_INT)
-              {
-                int e = r->v.o_const.v.v.c_int.v - l->v.o_const.v.v.c_int.v;
-
-                obj_t *o = sf_objstore_req_forconst ((const_t *)(const_t[]){
-                    { .type = CONST_INT, .v.c_int.v = e } });
-
-                if (o == NULL)
-                  {
-                    o = sf_objstore_req ();
-                    o->type = OBJ_CONST;
-                    o->v.o_const.v.type = CONST_INT;
-                    o->v.o_const.v.v.c_int.v = e;
-                  }
-
-                push (vm, o);
-                IR (o);
-              }
-
-            DR (l, vm);
-            DR (r, vm);
-          }
-          break;
-
-        case OP_MUL:
-          {
-            obj_t *l = pop (vm);
-            obj_t *r = pop (vm);
-
-            // IR (l);
-            // IR (r);
-
-            if (r->type == l->type && l->type == OBJ_CONST
-                && l->v.o_const.v.type == r->v.o_const.v.type
-                && l->v.o_const.v.type == CONST_INT)
-              {
-                int e = r->v.o_const.v.v.c_int.v * l->v.o_const.v.v.c_int.v;
-
-                obj_t *o = sf_objstore_req_forconst ((const_t *)(const_t[]){
-                    { .type = CONST_INT, .v.c_int.v = e } });
-
-                if (o == NULL)
-                  {
-                    o = sf_objstore_req ();
-                    o->type = OBJ_CONST;
-                    o->v.o_const.v.type = CONST_INT;
-                    o->v.o_const.v.v.c_int.v = e;
-                  }
-
-                push (vm, o);
-                IR (o);
-              }
-
-            DR (l, vm);
-            DR (r, vm);
-          }
-          break;
-
-        case OP_CMP:
-          {
-            obj_t *r = pop (vm);
-            obj_t *l = pop (vm);
-
-            // IR (l);
-            // IR (r);
-
-            int rc = 0;
-
-            switch (i.a)
-              {
-              case CMP_EQEQ:
-                {
-                  rc = sf_obj_eqeq (l, r);
-                }
-                break;
-
-              case CMP_GE:
-                {
-                  rc = sf_obj_ge (l, r);
-                }
-                break;
-
-              case CMP_GEQ:
-                {
-                  rc = sf_obj_geq (l, r);
-                }
-                break;
-
-              case CMP_LE:
-                {
-                  rc = sf_obj_le (l, r);
-                }
-                break;
-
-              case CMP_LEQ:
-                {
-                  rc = sf_obj_leq (l, r);
-                }
-                break;
-
-              case CMP_NEQ:
-                {
-                  rc = sf_obj_neq (l, r);
-                }
-                break;
-
-              default:
-                break;
-              }
-
-            const_t bc = (const_t){ .type = CONST_BOOL, .v.c_bool.v = rc };
-
-            obj_t *o_bc = sf_objstore_req_forconst (&bc);
-
-            if (o_bc == NULL)
-              {
-                o_bc = sf_objstore_req ();
-
-                o_bc->type = OBJ_CONST;
-                o_bc->v.o_const.v = bc;
-              }
-
-            push (vm, o_bc);
-            IR (o_bc);
-
-            DR (l, vm);
-            DR (r, vm);
-          }
-          break;
-
-        case OP_LOAD_BUILDCLASS:
-          {
-            frame_t nf = sf_frame_new_name ();
-
-            nf.return_ip = i.a; /* buildclass_end location */
-            sf_vm_addframe (vm, nf);
-
-            fr = &vm->frames[vm->fp - 1];
-          }
-          break;
-
-        case OP_LOAD_BUILDCLASS_END:
-          {
-            frame_t f = vm->frames[--vm->fp];
-            assert (f.type == FRAME_NAME);
-
-            class_t *cl = sf_class_new ();
-
-            cl->svl = f.n.nvl;
-            cl->svc = f.n.nvl;
-
-            // cl->slots = SFMALLOC (sizeof (*cl->slots));
-            // cl->vals = SFMALLOC (sizeof (*cl->vals));
-
-            // for (size_t j = 0; j < f.n.nvl; j++)
-            //   {
-            //     cl->vals[j] = f.n.vals[j];
-            //     cl->slots[j] = f.n.names[j];
-            //   }
-
-            cl->slots = f.n.names;
-            cl->vals = f.n.vals;
-            cl->name = vm->insts[i.a].c;
-
-            obj_t *o = sf_objstore_req ();
-            o->type = OBJ_CLASS;
-            o->v.o_class.v = cl;
-
-            push (vm, o);
-            IR (o);
-          }
-          break;
-
-        case OP_DOT_ACCESS:
-          {
-            obj_t *l = pop (vm);
-            char *name = i.c;
-
-            obj_t *o = container_access (l, name);
-
-            if (o == NULL)
-              {
-                printf ("member '%s' does not exist.\n", name);
-                exit (EXIT_FAILURE);
-              }
-
-            push (vm, o);
-            IR (o);
-            DR (l, vm);
-          }
-          break;
-
-        case OP_LOAD_ARRAY:
-          {
-            array_t *ar = sf_array_withsize (i.a);
-            for (int j = i.a - 1; j >= 0; j--)
-              {
-                ar->vals[j] = pop (vm);
-              }
-
-            obj_t *o = sf_objstore_req ();
-            o->type = OBJ_ARRAY;
-            o->v.o_array.v = ar;
-
-            push (vm, o);
-            IR (o);
-          }
-          break;
-
-        case OP_SQR_ACCESS:
-          {
-            obj_t *idx = pop (vm);
-            obj_t *par = pop (vm);
-
-            obj_t *o = sqr_access (par, idx);
-            push (vm, o);
-            IR (o);
-          }
-          break;
-
-        default:
-          break;
-        }
-
-      i = vm->insts[++vm->ip];
-    }
+  sf_vm_exec_single_frame (vm);
 
 end:;
-
-  vm->ip = fr->return_ip;
   i = vm->insts[vm->ip];
 
   // while (vm->sp > fr->stack_base)
