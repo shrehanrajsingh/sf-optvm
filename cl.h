@@ -34,6 +34,7 @@ typedef struct __cobj_s
   struct object_s **vals;
   size_t svl;
   size_t svc;
+  int destructor_called;
 
 } cobj_t;
 

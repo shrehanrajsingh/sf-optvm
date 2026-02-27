@@ -385,6 +385,34 @@ sf_vm_gen_b_fromexpr (vm_t *vm, expr_t e)
       }
       break;
 
+    case EXPR_ARRAY:
+      {
+        for (size_t i = 0; i < e.v.e_array.vl; i++)
+          {
+            sf_vm_gen_b_fromexpr (vm, *e.v.e_array.vals[i]);
+          }
+
+        add_inst (vm, (instr_t){
+                          .op = OP_LOAD_ARRAY,
+                          .a = e.v.e_array.vl,
+                          .b = 0,
+                      });
+      }
+      break;
+
+    case EXPR_SQUARE_ACCESS:
+      {
+        sf_vm_gen_b_fromexpr (vm, *e.v.e_sqr_access.parent);
+        sf_vm_gen_b_fromexpr (vm, *e.v.e_sqr_access.idx);
+
+        add_inst (vm, (instr_t){
+                          .op = OP_SQR_ACCESS,
+                          .a = 0,
+                          .b = 0,
+                      });
+      }
+      break;
+
     default:
       break;
     }

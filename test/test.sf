@@ -1,10 +1,6 @@
-class Node
-    fun _init (self, val, next)
-        self.val = val
-        self.next = next
+a = [1, 2, 3, 4, 10]
+i = 0
 
-while 1
-    a = Node (1, Node (2, Node (3, none)))
-    while a
-        putln (a.val)
-        a = a.next
+while i < 5
+    putln (a[i])
+    i = i + 1

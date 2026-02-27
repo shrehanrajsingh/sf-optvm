@@ -1,4 +1,5 @@
 #include "object.h"
+#include "bytecode.h"
 
 static obj_t **objstore = NULL;
 
@@ -131,7 +132,7 @@ sf_obj_rc_inc (obj_t *o)
 }
 
 SF_API void
-sf_obj_rc_dec (obj_t *o)
+sf_obj_rc_dec (obj_t *o, vm_t *vm)
 {
   int old = atomic_fetch_sub_explicit (&o->meta.ref_count, 1,
                                        memory_order_acq_rel);
@@ -140,12 +141,12 @@ sf_obj_rc_dec (obj_t *o)
     {
       atomic_thread_fence (memory_order_acquire);
       /* free object */
-      sf_obj_free (o);
+      sf_obj_free (o, vm);
     }
 }
 
 SF_API void
-sf_obj_free (obj_t *o)
+sf_obj_free (obj_t *o, vm_t *vm)
 {
   o->meta.active = 0;
 
@@ -158,30 +159,37 @@ sf_obj_free (obj_t *o)
     {
       cobj_t *c = o->v.o_cobj.v;
 
-      if (c->vals != NULL)
-        {
-          for (size_t i = 0; i < c->svc; i++)
-            {
-              if (c->vals[i] != NULL)
-                {
-                  DR (c->vals[i]);
-                }
-            }
-        }
+      // if (c->destructor_called)
+      {
+        if (c->vals != NULL)
+          {
+            for (size_t i = 0; i < c->svc; i++)
+              {
+                if (c->vals[i] != NULL)
+                  {
+                    DR (c->vals[i], vm);
+                  }
+              }
+          }
 
-      sf_cobj_free (c);
+        sf_cobj_free (c);
+      }
+      /* else
+        {
+          c->destructor_called = 1;
+        } */
     }
 
   if (o->type == OBJ_HFF)
     {
       for (size_t i = 0; i < o->v.o_hff.al; i++)
         {
-          DR (o->v.o_hff.args[i]);
+          DR (o->v.o_hff.args[i], vm);
         }
 
       if (o->v.o_hff.args != NULL)
         SFFREE (o->v.o_hff.args);
-      // DR (o->v.o_hff.f);
+      // DR (o->v.o_hff.f, vm);
     }
 
   if (osfil >= osfic)
@@ -270,13 +278,31 @@ sf_obj_print (obj_t o)
       printf ("<object '%s'>", o.v.o_cobj.v->p->name);
       break;
 
+    case OBJ_ARRAY:
+      {
+        array_t *a = o.v.o_array.v;
+
+        putchar ('[');
+        for (size_t i = 0; i < a->len; i++)
+          {
+            assert (a->vals[i] != NULL);
+            sf_obj_print (*a->vals[i]);
+
+            if (i != a->len - 1)
+              fprintf (stdout, ", ");
+            else
+              putchar (']');
+          }
+      }
+      break;
+
     case OBJ_HFF:
       D (printf ("[hff]"));
       sf_obj_print (*o.v.o_hff.f);
       break;
 
     default:
-      printf ("<object:unknown>");
+      printf ("<object:unknown %d>", o.type);
       break;
     }
 

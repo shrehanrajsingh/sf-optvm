@@ -14,6 +14,8 @@ enum ExprType
   EXPR_FUNCALL,
   EXPR_CMP,
   EXPR_DOT_ACCESS,
+  EXPR_ARRAY,
+  EXPR_SQUARE_ACCESS,
   EXPR_COUNT
 };
 
@@ -79,7 +81,22 @@ typedef struct __expr_s
     {
       struct __expr_s *left;
       char *right;
+
     } e_dota;
+
+    struct
+    {
+      struct __expr_s **vals;
+      size_t vl;
+
+    } e_array;
+
+    struct
+    {
+      struct __expr_s *parent;
+      struct __expr_s *idx;
+
+    } e_sqr_access;
 
   } v;
 

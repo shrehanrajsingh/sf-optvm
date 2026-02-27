@@ -771,6 +771,7 @@ SF_API expr_t *
 sf_expr_gen (token_t *start, token_t *end)
 {
   expr_t e;
+  e.type = -1;
 
   // token_t *stt = start;
   // while (stt != end)
@@ -1103,6 +1104,107 @@ sf_expr_gen (token_t *start, token_t *end)
 
                 e = re;
                 start++;
+              }
+            else if (*op == '[')
+              {
+                if (e.type == -1)
+                  {
+                    expr_t **args = SFMALLOC (64 * sizeof (*args));
+                    size_t ac = 64;
+                    size_t al = 0;
+
+                    expr_t r;
+                    r.type = EXPR_ARRAY;
+
+                    token_t *left = start;
+                    int gb = 0;
+                    int _end = 0;
+
+                    while (start <= end)
+                      {
+                        token_t u = *start++;
+
+                        if (al >= ac)
+                          {
+                            ac += 64;
+                            args = SFREALLOC (args, ac * sizeof (*args));
+                          }
+
+                        if (u.type == TOK_OPERATOR)
+                          {
+                            const char *op = u.v.t_operator.value;
+
+                            if (*op == ']' && !gb)
+                              {
+                                _end = 1;
+                                if (left == start - 1)
+                                  {
+                                    /* no args */
+                                  }
+                                else
+                                  {
+                                    args[al++] = sf_expr_gen (left, start - 1);
+                                  }
+                                break;
+                              }
+
+                            if (*op == ',' && !gb)
+                              {
+                                args[al++] = sf_expr_gen (left, start - 1);
+                                left = start;
+                              }
+
+                            if (strstr ("({[", op) != NULL)
+                              gb++;
+
+                            if (strstr (")}]", op) != NULL)
+                              gb--;
+                          }
+                      }
+
+                    assert (_end && "syntax error");
+                    r.v.e_array.vals = args;
+                    r.v.e_array.vl = al;
+
+                    e = r;
+                  }
+                else
+                  {
+                    int gb = 0;
+                    int _end = 0;
+                    token_t *stp = start;
+
+                    while (start <= end)
+                      {
+                        token_t u = *start++;
+
+                        if (u.type == TOK_OPERATOR)
+                          {
+                            const char *op = u.v.t_operator.value;
+
+                            if (*op == ']' && !gb)
+                              {
+                                _end = 1;
+                                break;
+                              }
+
+                            if (strstr ("({[", op) != NULL)
+                              gb++;
+
+                            if (strstr (")}]", op) != NULL)
+                              gb--;
+                          }
+                      }
+
+                    assert (_end && "syntax error");
+
+                    expr_t ep = e;
+                    e.type = EXPR_SQUARE_ACCESS;
+                    e.v.e_sqr_access.idx = sf_expr_gen (stp, start);
+                    e.v.e_sqr_access.parent
+                        = SFMALLOC (sizeof (*e.v.e_sqr_access.parent));
+                    *e.v.e_sqr_access.parent = ep;
+                  }
               }
           }
           break;

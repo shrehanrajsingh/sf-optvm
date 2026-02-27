@@ -32,6 +32,8 @@ typedef enum OpcodeType
   OP_LOAD_BUILDCLASS_END,
   OP_LOAD_NAME,
   OP_DOT_ACCESS,
+  OP_LOAD_ARRAY,
+  OP_SQR_ACCESS,
   //   OP_STACK_POP,
   //   OP_STACK_PUSH,
   OP_RETURN
@@ -149,11 +151,16 @@ extern "C"
   SF_API void sf_vm_print_b (vm_t *);
 
   SF_API void sf_vm_exec_frame_top (vm_t *);
+  SF_API void sf_vm_exec_single_frame (vm_t *);
   SF_API frame_t sf_frame_new_local ();
   SF_API frame_t sf_frame_new_name ();
   SF_API void sf_vm_addframe (vm_t *, frame_t);
-  SF_API void sf_vm_framefree (frame_t *);
+  SF_API void sf_vm_framefree (frame_t *, vm_t *);
   SF_API void sf_vm_popframe (vm_t *);
+  SF_API obj_t *container_access (obj_t *, char *);
+  SF_API void container_set (obj_t *, char *, obj_t *, vm_t *);
+  SF_API obj_t *sqr_access (obj_t *, obj_t *);
+  SF_API void sqr_set (obj_t *, obj_t *, obj_t *, vm_t *);
 
 #if defined(__cplusplus)
 }

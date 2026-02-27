@@ -102,6 +102,28 @@ sf_expr_print (expr_t e)
         printf ("\nright: %s\n", e.v.e_dota.right);
       }
       break;
+
+    case EXPR_ARRAY:
+      {
+        printf ("EXPR_ARRAY (%lu):\n", e.v.e_array.vl);
+
+        for (size_t i = 0; i < e.v.e_array.vl; i++)
+          {
+            sf_expr_print (*e.v.e_array.vals[i]);
+            putchar ('\n');
+          }
+      }
+      break;
+
+    case EXPR_SQUARE_ACCESS:
+      {
+        printf ("EXPR_SQUARE_ACCESS:\nparent: ");
+        sf_expr_print (*e.v.e_sqr_access.parent);
+        printf ("\nidx: ");
+        sf_expr_print (*e.v.e_sqr_access.idx);
+      }
+      break;
+
     default:
       {
         printf ("<expr?> %d\n", e.type);

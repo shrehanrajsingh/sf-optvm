@@ -1,6 +1,7 @@
 #if !defined(OBJECT_H)
 #define OBJECT_H
 
+#include "array.h"
 #include "cl.h"
 #include "const.h"
 #include "fun.h"
@@ -8,12 +9,15 @@
 #include "malloc.h"
 #include "mut.h"
 
+struct _vm_s;
+
 enum ObjectType
 {
   OBJ_CONST,
   OBJ_FUNC,
   OBJ_CLASS,
   OBJ_COBJ,
+  OBJ_ARRAY,
   OBJ_HFF, /* half function */
 };
 
@@ -55,6 +59,12 @@ typedef struct object_s
 
     } o_hff;
 
+    struct
+    {
+      array_t *v;
+
+    } o_array;
+
   } v;
 
   struct
@@ -72,9 +82,9 @@ typedef struct object_s
     sf_obj_rc_inc ((X));                                                      \
   }
 
-#define DR(X)                                                                 \
+#define DR(X, Y)                                                              \
   {                                                                           \
-    sf_obj_rc_dec ((X));                                                      \
+    sf_obj_rc_dec ((X), (Y));                                                 \
   }
 
 #if defined(__cplusplus)
@@ -88,8 +98,8 @@ extern "C"
 
   SF_API obj_t sf_objnew (int);
   SF_API void sf_obj_rc_inc (obj_t *);
-  SF_API void sf_obj_rc_dec (obj_t *);
-  SF_API void sf_obj_free (obj_t *);
+  SF_API void sf_obj_rc_dec (obj_t *, struct _vm_s *);
+  SF_API void sf_obj_free (obj_t *, struct _vm_s *);
   SF_API void sf_obj_print (obj_t);
   SF_API obj_t **sf_get_objstore ();
 

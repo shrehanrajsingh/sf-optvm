@@ -14,10 +14,8 @@ add_library(sunflower
     token.h token.c
     stmt.h stmt.c
     expr.h expr.c
-    parser.h parser.c
     const.h const.c
     object.h object.c
-    mod.h mod.c
     mut.h mut.c
     ht.h ht.c
     fun.h fun.c
@@ -26,5 +24,6 @@ add_library(sunflower
     bytecode.h bytecode.c
     codegen.h codegen.c
     cl.h cl.c
+    array.h array.c
     sunflower.h sunflower.c)
 
