@@ -222,6 +222,19 @@ sf_obj_free (obj_t *o, vm_t *vm)
                   // D (printf ("%d\n", vm->fp));
                 }
             }
+
+          if (c->vals != NULL)
+            {
+              for (size_t i = 0; i < c->svc; i++)
+                {
+                  if (c->vals[i] != NULL)
+                    {
+                      DR (c->vals[i], vm);
+                    }
+                }
+            }
+
+          sf_cobj_free (c);
         }
     }
 

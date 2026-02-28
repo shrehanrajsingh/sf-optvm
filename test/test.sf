@@ -3,6 +3,10 @@ class Node
         self.value = value
         self.next = next
 
+    fun _kill (self)
+        put ("killing ")
+        putln (self.value)
+
 a = Node (0, none)
 d = a
 
