@@ -475,6 +475,19 @@ sf_vm_gen_bytecode (vm_t *vm, StmtSM *smt)
                 }
                 break;
 
+              case EXPR_SQUARE_ACCESS:
+                {
+                  sf_vm_gen_b_fromexpr (vm, *name->v.e_sqr_access.idx);
+                  sf_vm_gen_b_fromexpr (vm, *name->v.e_sqr_access.parent);
+
+                  add_inst (vm, (instr_t){
+                                    .op = OP_STORE_SQR,
+                                    .a = 0,
+                                    .b = 0,
+                                });
+                }
+                break;
+
               default:
                 break;
               }

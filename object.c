@@ -177,26 +177,28 @@ sf_obj_free (obj_t *o, vm_t *vm)
         }
       else
         {
+          o->meta.active = 1;
           c->destructor_called = 1;
 
+          // D (printf ("%d\n", o->meta.ref_count));
           obj_t *_kill_method = container_access (o, "_kill");
-          // D (printf ("%d\n", _kill_method == NULL));
 
-          if (_kill_method != NULL)
+          if (_kill_method != NULL && _kill_method->type == OBJ_HFF)
             {
-              assert (_kill_method->type == OBJ_HFF);
+              IR (_kill_method);
               obj_t *o_f = _kill_method->v.o_hff.f;
 
               // sf_obj_print (*o_f);
               assert (o_f->type == OBJ_FUNC);
               fun_t *f = o_f->v.o_fun.v;
 
-              if (o_f->type == FUN_CODED)
+              if (f->type == FUN_CODED)
                 {
                   assert (f->argl == 1); /* only self */
                   size_t lp = f->v.coded.lp;
 
                   IR (o);
+                  // D (printf ("%d\n", o->meta.ref_count));
                   if (vm->sp >= vm->stack_cap)
                     {
                       vm->stack_cap += SF_VM_STACK_CAP;
@@ -219,22 +221,41 @@ sf_obj_free (obj_t *o, vm_t *vm)
                   sf_vm_exec_single_frame (vm);
                   // D (printf ("%d\n", vm->fp));
                   sf_vm_popframe (vm);
+
+                  // D (printf ("%d\n", o->meta.ref_count));
                   // D (printf ("%d\n", vm->fp));
                 }
-            }
-
-          if (c->vals != NULL)
-            {
-              for (size_t i = 0; i < c->svc; i++)
+              else if (f->type == FUN_NATIVE)
                 {
-                  if (c->vals[i] != NULL)
+                  /* TODO */
+                }
+
+              DR (_kill_method, vm);
+              return;
+            }
+          else
+            {
+              if (c->vals != NULL)
+                {
+                  for (size_t i = 0; i < c->svc; i++)
                     {
-                      DR (c->vals[i], vm);
+                      if (c->vals[i] != NULL)
+                        {
+                          DR (c->vals[i], vm);
+                        }
                     }
                 }
+
+              sf_cobj_free (c);
             }
 
-          sf_cobj_free (c);
+          // D (printf ("%d\n", o->meta.ref_count));
+          // D (printf ("%d\n", _kill_method == NULL));
+
+          // SFFREE (_kill_method->v.o_hff.args);
+          // _kill_method->v.o_hff.args = NULL;
+          // _kill_method->v.o_hff.al = 0;
+          // DR (_kill_method->v.o_hff.f, vm);
         }
     }
 

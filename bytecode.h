@@ -18,6 +18,7 @@ typedef enum OpcodeType
   OP_STORE,
   OP_STORE_FAST,
   OP_STORE_NAME,
+  OP_STORE_SQR,
   OP_CALL,
   OP_ADD_1,
   OP_ADD,

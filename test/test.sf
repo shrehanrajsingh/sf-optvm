@@ -3,21 +3,21 @@ class Node
         self.value = value
         self.next = next
 
-    fun _kill (self)
-        put ("killing ")
-        putln (self.value)
-
-a = Node (0, none)
-d = a
-
 b = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
-i = 0
 
-while i < 10
-    d.next = Node (b[i], none)
-    d = d.next
-    i = i + 1
+while 1
+    a = Node (0, none)
+    d = a
 
-while a
-    putln (a.value)
-    a = a.next
+    i = 0
+
+    while i < 10
+        d.next = Node (b[i], none)
+        d = d.next
+        i = i + 1
+
+    while a
+        putln (a.value)
+        a = a.next
+
+    putln ("here")

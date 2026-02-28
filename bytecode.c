@@ -111,6 +111,9 @@ sf_vm_print_inst (instr_t i)
     case OP_SQR_ACCESS:
       printf ("OP_SQR_ACCESS: ");
       break;
+    case OP_STORE_SQR:
+      printf ("OP_STORE_SQR: ");
+      break;
     // case OP_STACK_POP:
     //   fputs ("OP_STACK_POP:", stdout);
     //   break;
@@ -317,6 +320,16 @@ start:;
                 // D (printf ("%d\n", val->meta.ref_count));
                 DR (val, vm);
               }
+          }
+          break;
+
+        case OP_STORE_SQR:
+          {
+            obj_t *par = pop (vm);
+            obj_t *idx = pop (vm);
+            obj_t *val = pop (vm);
+
+            sqr_set (par, idx, val, vm);
           }
           break;
 
@@ -806,11 +819,11 @@ start:;
                         {
                           D (printf ("[TODO] native function as an _init"));
                         }
-                    }
 
-                  /* resolve r-values */
-                  IR (_init_method);
-                  DR (_init_method, vm);
+                      /* resolve r-values */
+                      IR (_init_method);
+                      DR (_init_method, vm);
+                    }
                 }
                 break;
 
@@ -1417,6 +1430,7 @@ container_access (obj_t *o, char *name)
 
             oj->type = OBJ_HFF;
             oj->v.o_hff.f = r;
+            // IR (r);
 
             oj->v.o_hff.al = 1;
             oj->v.o_hff.args = SFMALLOC (sizeof (*oj->v.o_hff.args));
@@ -1472,7 +1486,7 @@ container_set (obj_t *p, char *n, obj_t *v, vm_t *vm)
                 co->vals = SFREALLOC (co->vals, co->svc * sizeof (*co->vals));
               }
 
-            co->slots[co->svl] = n;
+            co->slots[co->svl] = SFSTRDUP (n);
             co->vals[co->svl++] = v;
           }
       }
@@ -1511,5 +1525,23 @@ sqr_access (obj_t *p, obj_t *v)
 SF_API void
 sqr_set (obj_t *p, obj_t *i, obj_t *val, vm_t *vm)
 {
-  /* TODO */
+  switch (p->type)
+    {
+    case OBJ_ARRAY:
+      {
+        assert (i->type == OBJ_CONST && i->v.o_const.v.type == CONST_INT);
+
+        int idx = i->v.o_const.v.v.c_int.v;
+        array_t *a = p->v.o_array.v;
+
+        assert (a->len > idx);
+
+        DR (a->vals[idx], vm);
+        a->vals[idx] = val;
+      }
+      break;
+
+    default:
+      break;
+    }
 }

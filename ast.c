@@ -120,7 +120,7 @@ sf_ast_gen (TokenSM *smt)
                 int gb = 0;
                 token_t t;
 
-                while (!gb && smt_back > smt->vals)
+                while (smt_back > smt->vals)
                   {
                     t = *--smt_back;
 
@@ -187,6 +187,12 @@ sf_ast_gen (TokenSM *smt)
 
                 stmt_t st;
                 st.type = STMT_VARDECL;
+
+                // here;
+                // for (token_t *t = smt_back; t < smtv - 1; t++)
+                //   sf_token_print (*t);
+                // here;
+
                 st.v.s_vardecl.name = sf_expr_gen (smt_back, smtv - 1);
                 st.v.s_vardecl.val = sf_expr_gen (smtv, smt_front - 1);
 
