@@ -7,6 +7,7 @@
 #include "expr.h"
 #include "header.h"
 #include "ht.h"
+#include "iter.h"
 #include "object.h"
 #include "stmt.h"
 
@@ -35,6 +36,9 @@ typedef enum OpcodeType
   OP_DOT_ACCESS,
   OP_LOAD_ARRAY,
   OP_SQR_ACCESS,
+  OP_RANGE_FAST,
+  OP_GET_ITER,
+  OP_LOAD_ITER_NEXT,
   //   OP_STACK_POP,
   //   OP_STACK_PUSH,
   OP_RETURN

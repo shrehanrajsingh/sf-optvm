@@ -545,6 +545,133 @@ sf_ast_gen (TokenSM *smt)
                 smtv = block_end;
                 res->vals[res->vl++] = st;
               }
+            else if (!strcmp (kw, "for"))
+              {
+                size_t tb = get_tbsp (smtv, smt->vals);
+                // sf_token_print (*smtv);
+                // D (printf ("tabspace: %lu\n", tb));
+
+                token_t *l1 = smtv;
+                token_t *l2 = smtv;
+                token_t *l3 = smtv;
+
+                expr_t **vars = SFMALLOC (64 * sizeof (*vars));
+                size_t vc = 64;
+                size_t vl = 0;
+
+                int gb = 0;
+                while (l2->type != TOK_EOF)
+                  {
+                    token_t t = *l2++;
+
+                    if (t.type == TOK_OPERATOR)
+                      {
+                        const char *op = t.v.t_operator.value;
+
+                        if (strstr ("({[", op) != NULL)
+                          gb++;
+
+                        if (strstr (")}]", op) != NULL)
+                          gb--;
+
+                        if (*op == ',' && !gb)
+                          {
+                            if (vl >= vc)
+                              {
+                                vc += 64;
+                                vars = SFREALLOC (vars, vc * sizeof (*vars));
+                              }
+
+                            vars[vl++] = sf_expr_gen (l3, l2 - 1);
+                            l3 = l2;
+                          }
+                      }
+
+                    if (t.type == TOK_KEYWORD && !gb)
+                      {
+                        const char *kw = t.v.t_keyword.value;
+
+                        if (!strcmp (kw, "in"))
+                          {
+                            if (vl >= vc)
+                              {
+                                vc += 64;
+                                vars = SFREALLOC (vars, vc * sizeof (*vars));
+                              }
+
+                            vars[vl++] = sf_expr_gen (l3, l2 - 1);
+                            l3 = l2;
+
+                            break;
+                          }
+                      }
+                  }
+
+                l1 = l2;
+                gb = 0;
+                while (l1->type != TOK_EOF)
+                  {
+                    token_t t = *l1++;
+
+                    if (t.type == TOK_OPERATOR)
+                      {
+                        const char *op = t.v.t_operator.value;
+
+                        if (strstr ("({[", op) != NULL)
+                          gb++;
+
+                        if (strstr (")}]", op) != NULL)
+                          gb--;
+                      }
+
+                    if (t.type == TOK_NEWLINE && !gb)
+                      {
+                        break;
+                      }
+                  }
+
+                // for (int i = 0; i < vl; i++)
+                //   {
+                //     D (sf_expr_print (*vars[i]));
+                //     putchar ('\n');
+                //   }
+
+                expr_t *cond = sf_expr_gen (l2, --l1);
+                token_t *block_end = get_block (l1, tb);
+
+                TokenSM tsmt;
+                tsmt.vals = l1;
+                tsmt.vl = block_end - l1;
+
+                block_end++;
+                token_t bep = *block_end;
+                block_end->type = TOK_EOF;
+
+                StmtSM *body_smt = sf_ast_gen (&tsmt);
+                *block_end = bep;
+
+                while (block_end->type != TOK_EOF)
+                  {
+                    if (block_end->type == TOK_NEWLINE
+                        || block_end->type == TOK_SPACE)
+                      ;
+                    else
+                      break;
+
+                    block_end++;
+                  }
+
+                stmt_t st;
+                st.type = STMT_FOR;
+                st.v.s_for.bl = body_smt->vl;
+                st.v.s_for.body = body_smt->vals;
+                st.v.s_for.vars = vars;
+                st.v.s_for.vl = vl;
+                st.v.s_for.cond = cond;
+
+                smtv = block_end;
+                res->vals[res->vl++] = st;
+              }
             else if (!strcmp (kw, "fun"))
               {
                 size_t tb = get_tbsp (smtv, smt->vals);
@@ -1211,6 +1338,63 @@ sf_expr_gen (token_t *start, token_t *end)
                         = SFMALLOC (sizeof (*e.v.e_sqr_access.parent));
                     *e.v.e_sqr_access.parent = ep;
                   }
+              }
+          }
+          break;
+
+        case TOK_KEYWORD:
+          {
+            const char *kw = t.v.t_keyword.value;
+
+            if (!strcmp (kw, "to"))
+              {
+                expr_t ep = e;
+                e.type = EXPR_TO_STEP;
+
+                e.v.e_to_step.lval
+                    = SFMALLOC (1 * sizeof (*e.v.e_to_step.lval));
+                *e.v.e_to_step.lval = ep;
+
+                int gb = 0;
+                int saw_step = 0;
+                token_t *stp = start;
+
+                while (start < end)
+                  {
+                    token_t u = *start++;
+
+                    if (u.type == TOK_OPERATOR)
+                      {
+                        const char *op = u.v.t_operator.value;
+                        if (strstr ("({[", op) != NULL)
+                          gb++;
+
+                        if (strstr (")}]", op) != NULL)
+                          gb--;
+                      }
+
+                    if (u.type == TOK_KEYWORD && !gb)
+                      {
+                        const char *kw = u.v.t_keyword.value;
+
+                        if (!strcmp (kw, "step"))
+                          {
+                            saw_step = 1;
+                            break;
+                          }
+                      }
+                  }
+
+                e.v.e_to_step.rval = sf_expr_gen (stp, start);
+
+                if (saw_step)
+                  {
+                    // D (sf_token_print (*start));
+                    e.v.e_to_step.step = sf_expr_gen (start, end);
+                    goto end;
+                  }
+                else
+                  e.v.e_to_step.step = NULL;
               }
           }
           break;

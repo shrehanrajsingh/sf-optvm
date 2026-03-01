@@ -6,6 +6,7 @@
 #include "const.h"
 #include "fun.h"
 #include "header.h"
+#include "iter.h"
 #include "malloc.h"
 #include "mut.h"
 
@@ -18,6 +19,7 @@ enum ObjectType
   OBJ_CLASS,
   OBJ_COBJ,
   OBJ_ARRAY,
+  OBJ_ITER,
   OBJ_HFF, /* half function */
 };
 
@@ -64,6 +66,12 @@ typedef struct object_s
       array_t *v;
 
     } o_array;
+
+    struct
+    {
+      iter_t v;
+
+    } o_iter;
 
   } v;
 

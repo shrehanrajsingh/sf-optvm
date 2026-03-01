@@ -413,6 +413,39 @@ sf_vm_gen_b_fromexpr (vm_t *vm, expr_t e)
       }
       break;
 
+    case EXPR_TO_STEP:
+      {
+        expr_t *lval = e.v.e_to_step.lval;
+        expr_t *rval = e.v.e_to_step.rval;
+        expr_t *step = e.v.e_to_step.step;
+
+        if (EXPR_IS_INT (lval) && EXPR_IS_INT (rval))
+          {
+            if (step == NULL)
+              {
+                add_inst (
+                    vm,
+                    (instr_t){
+                        .op = OP_RANGE_FAST,
+                        .a = lval->v.e_const.v.v.c_int.v,
+                        .b = rval->v.e_const.v.v.c_int.v,
+                        .c = (char *)1, /* use c as step, I know, not ideal */
+                    });
+              }
+            else
+              {
+                if (EXPR_IS_INT (step))
+                  add_inst (vm, (instr_t){
+                                    .op = OP_RANGE_FAST,
+                                    .a = lval->v.e_const.v.v.c_int.v,
+                                    .b = rval->v.e_const.v.v.c_int.v,
+                                    .c = (char *)step->v.e_const.v.v.c_int.v,
+                                });
+              }
+          }
+      }
+      break;
+
     default:
       break;
     }
@@ -599,10 +632,10 @@ sf_vm_gen_bytecode (vm_t *vm, StmtSM *smt)
             smt.vals = body;
             smt.vc = smt.vl = bl;
 
-            here;
-            for (int i = 0; i < bl; i++)
-              sf_stmt_print (body[i]);
-            here;
+            // here;
+            // for (int i = 0; i < bl; i++)
+            //   sf_stmt_print (body[i]);
+            // here;
 
             sf_vm_gen_bytecode (vm, &smt);
 
@@ -803,6 +836,84 @@ sf_vm_gen_bytecode (vm_t *vm, StmtSM *smt)
                                 .b = 0,
                                 .c = (char *)name,
                             });
+          }
+          break;
+
+        case STMT_FOR:
+          {
+            stmt_t *body = s->v.s_for.body;
+            size_t bl = s->v.s_for.bl;
+
+            sf_vm_gen_b_fromexpr (vm, *s->v.s_for.cond);
+
+            add_inst (vm, (instr_t){
+                              .op = OP_GET_ITER,
+                              .a = 0,
+                              .b = 0,
+                          });
+
+            size_t jl = vm->inst_len;
+
+            add_inst (
+                vm,
+                (instr_t){
+                    .op = OP_LOAD_ITER_NEXT,
+                    .a = 0, /* this a stores the value to jump to if
+                               iterable is exhausted */
+                    .b = s->v.s_for.vl, /* this stores the number of ways you
+                               want to split any value of an iterable into
+                               (typically number of decomposition variables) */
+                });
+
+            size_t il = vm->inst_len;
+
+            for (size_t p = 0; p < s->v.s_for.vl; p++)
+              {
+                expr_t *name = s->v.s_for.vars[p];
+                vval_t *v = add_var (vm, (char *)name->v.e_var.v);
+
+                if (v->slot == SF_VM_SLOT_LOCAL)
+                  add_inst (vm, (instr_t){
+                                    .op = OP_STORE_FAST,
+                                    .a = v->pos,
+                                    .b = 0,
+                                });
+                else if (v->slot == SF_VM_SLOT_GLOBAL)
+                  add_inst (vm, (instr_t){
+                                    .op = OP_STORE,
+                                    .a = v->pos,
+                                    .b = 0,
+                                });
+                else if (v->slot == SF_VM_SLOT_NAME)
+                  add_inst (vm, (instr_t){ .op = OP_STORE_NAME,
+                                           .a = v->pos,
+                                           .b = 0,
+                                           .c = (char *)name->v.e_var.v });
+              }
+
+            StmtSM smt;
+            smt.vals = body;
+            smt.vc = smt.vl = bl;
+
+            // here;
+            // for (int i = 0; i < bl; i++)
+            //   sf_stmt_print (body[i]);
+            // here;
+
+            sf_vm_gen_bytecode (vm, &smt);
+
+            vm->inst_len--; // eat return
+
+            // D (printf ("%d\n", vl));
+            add_inst (vm, (instr_t){
+                              .op = OP_JUMP,
+                              .a = jl,
+                              .b = 0,
+                          });
+
+            // D (printf ("%d\n", vm->inst_len));
+
+            vm->insts[jl].a = vm->inst_len;
           }
           break;
 

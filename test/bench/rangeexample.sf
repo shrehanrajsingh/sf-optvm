@@ -1,0 +1,30 @@
+class Range
+    l = 0
+    h = 0
+    s = 0
+    p = 0
+
+    fun _init (self, low, high, stp)
+        self.l = low
+        self.h = high
+        self.s = stp
+        self.p = self.l
+
+    fun next (self)
+        if self.p > self.h - 1
+            return none
+        r = self.p
+        self.p = self.p + self.s
+
+        return r
+
+    fun _kill (self)
+        putln ("kill")
+
+while 1
+    r = Range (1, 10, 1)
+    p = r.next ()
+
+    while p != none
+        putln (p)
+        p = r.next ()

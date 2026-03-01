@@ -98,6 +98,26 @@ sf_stmt_print (stmt_t s)
       }
       break;
 
+    case STMT_FOR:
+      {
+        printf ("STMT_FOR: vars (%lu)", s.v.s_for.vl);
+
+        for (int i = 0; i < s.v.s_for.vl; i++)
+          {
+            printf ("\n(%d) ", i);
+            sf_expr_print (*s.v.s_for.vars[i]);
+          }
+
+        printf ("\ncond: ");
+        sf_expr_print (*s.v.s_for.cond);
+
+        printf ("\nbody (%lu)\n", s.v.s_for.bl);
+
+        for (int i = 0; i < s.v.s_for.bl; i++)
+          sf_stmt_print (s.v.s_for.body[i]);
+      }
+      break;
+
     case STMT_EOF:
       {
         printf ("STMT_EOF\n");

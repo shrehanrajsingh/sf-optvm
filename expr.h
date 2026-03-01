@@ -16,6 +16,7 @@ enum ExprType
   EXPR_DOT_ACCESS,
   EXPR_ARRAY,
   EXPR_SQUARE_ACCESS,
+  EXPR_TO_STEP,
   EXPR_COUNT
 };
 
@@ -98,9 +99,20 @@ typedef struct __expr_s
 
     } e_sqr_access;
 
+    struct
+    {
+      struct __expr_s *lval;
+      struct __expr_s *rval;
+      struct __expr_s *step;
+
+    } e_to_step;
+
   } v;
 
 } expr_t;
+
+#define EXPR_IS_INT(X)                                                        \
+  ((X)->type == EXPR_CONST && (X)->v.e_const.v.type == CONST_INT)
 
 #if defined(__cplusplus)
 extern "C"

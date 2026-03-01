@@ -25,5 +25,6 @@ add_library(sunflower
     codegen.h codegen.c
     cl.h cl.c
     array.h array.c
+    iter.h iter.c
     sunflower.h sunflower.c)
 

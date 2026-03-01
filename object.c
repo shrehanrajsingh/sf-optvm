@@ -155,6 +155,26 @@ sf_obj_free (obj_t *o, vm_t *vm)
       SFFREE (o->v.o_fun.v);
     }
 
+  if (o->type == OBJ_ARRAY)
+    {
+      array_t *a = o->v.o_array.v;
+
+      for (size_t i = 0; i < a->len; i++)
+        {
+          DR (a->vals[i], vm);
+          a->vals[i] = NULL;
+        }
+
+      a->len = 0;
+      SFFREE (a->vals);
+      SFFREE (a);
+    }
+
+  if (o->type == OBJ_ITER)
+    {
+      DR (o->v.o_iter.v.o, vm);
+    }
+
   if (o->type == OBJ_COBJ)
     {
       cobj_t *c = o->v.o_cobj.v;
@@ -268,7 +288,7 @@ sf_obj_free (obj_t *o, vm_t *vm)
 
       if (o->v.o_hff.args != NULL)
         SFFREE (o->v.o_hff.args);
-      // DR (o->v.o_hff.f, vm);
+      DR (o->v.o_hff.f, vm);
     }
 
   if (osfil >= osfic)
@@ -378,6 +398,10 @@ sf_obj_print (obj_t o)
     case OBJ_HFF:
       D (printf ("[hff]"));
       sf_obj_print (*o.v.o_hff.f);
+      break;
+
+    case OBJ_ITER:
+      printf ("<iter object '%p'>", o);
       break;
 
     default:

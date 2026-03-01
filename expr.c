@@ -124,6 +124,21 @@ sf_expr_print (expr_t e)
       }
       break;
 
+    case EXPR_TO_STEP:
+      {
+        printf ("EXPR_TO_STEP:\nlval: ");
+        sf_expr_print (*e.v.e_to_step.lval);
+        printf ("\nrval: ");
+        sf_expr_print (*e.v.e_to_step.rval);
+
+        if (e.v.e_to_step.step != NULL)
+          {
+            printf ("\nstep: ");
+            sf_expr_print (*e.v.e_to_step.step);
+          }
+      }
+      break;
+
     default:
       {
         printf ("<expr?> %d\n", e.type);

@@ -14,6 +14,7 @@ enum StmtType
   STMT_FUNDECL,
   STMT_RETURN,
   STMT_CLASSDECL,
+  STMT_FOR,
   STMT_EOF
 };
 
@@ -81,6 +82,18 @@ typedef struct __stmt_s
       size_t bl;
 
     } s_classdecl;
+
+    struct
+    {
+      expr_t **vars;
+      size_t vl;
+
+      struct __stmt_s *body;
+      size_t bl;
+
+      expr_t *cond;
+
+    } s_for;
 
   } v;
 

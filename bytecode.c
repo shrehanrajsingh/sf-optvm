@@ -114,6 +114,15 @@ sf_vm_print_inst (instr_t i)
     case OP_STORE_SQR:
       printf ("OP_STORE_SQR: ");
       break;
+    case OP_RANGE_FAST:
+      printf ("OP_RANGE_FAST: ");
+      break;
+    case OP_GET_ITER:
+      printf ("OP_GET_ITER: ");
+      break;
+    case OP_LOAD_ITER_NEXT:
+      printf ("OP_LOAD_ITER_NEXT: ");
+      break;
     // case OP_STACK_POP:
     //   fputs ("OP_STACK_POP:", stdout);
     //   break;
@@ -600,7 +609,10 @@ start:;
                   //   }
 
                   for (size_t j = 0; j < hf_al; j++)
-                    args[al++] = hf_args[j];
+                    {
+                      args[al++] = hf_args[j];
+                      IR (hf_args[j]);
+                    }
 
                   // al += hf_al;
                   assert (al == f->argl);
@@ -1099,7 +1111,9 @@ start:;
         case OP_DOT_ACCESS:
           {
             obj_t *l = pop (vm);
+            // D (sf_obj_print (*l); printf ("%d\n", l->meta.ref_count));
             char *name = i.c;
+            // D (printf ("%s\n", name));
 
             obj_t *o = container_access (l, name);
 
@@ -1146,6 +1160,111 @@ start:;
 
             DR (idx, vm);
             DR (par, vm);
+          }
+          break;
+
+        case OP_RANGE_FAST:
+          {
+            int lv = i.a;
+            int rv = i.b;
+            int step = (int)i.c;
+
+            if (lv < rv)
+              {
+                array_t *a = sf_array_withsize (((rv - 1 - lv) / step) + 1);
+
+                int c = 0;
+                for (int j = lv; j < rv; j += step)
+                  {
+                    obj_t *o
+                        = sf_objstore_req_forconst ((const_t *)(const_t[]){ {
+                            .type = CONST_INT,
+                            .v.c_int.v = j,
+                        } });
+
+                    if (o == NULL)
+                      {
+                        o = sf_objstore_req ();
+                        o->type = OBJ_CONST;
+                        o->v.o_const.v.type = CONST_INT;
+                        o->v.o_const.v.v.c_int.v = j;
+                      }
+
+                    a->vals[c++] = o;
+                    IR (o);
+                  }
+
+                if (a->len != c)
+                  a->len = c;
+
+                obj_t *o = sf_objstore_req ();
+                o->type = OBJ_ARRAY;
+                o->v.o_array.v = a;
+
+                push (vm, o);
+                IR (o);
+              }
+          }
+          break;
+
+        case OP_GET_ITER:
+          {
+            obj_t *v = pop (vm);
+
+            obj_t *o = sf_objstore_req ();
+            o->type = OBJ_ITER;
+            o->v.o_iter.v = sf_iter_new (v);
+
+            push (vm, o);
+            IR (o);
+          }
+          break;
+
+        case OP_LOAD_ITER_NEXT:
+          {
+            obj_t *iter = pop (vm);
+
+            assert (iter->type == OBJ_ITER);
+            obj_t *n = sf_iter_next (&iter->v.o_iter.v);
+
+            if (n == NULL)
+              {
+                vm->ip = i.a - 1;
+                DR (iter, vm);
+              }
+            else
+              {
+                push (vm, iter);
+                if (i.b == 1) /* just push the value */
+                  {
+                    push (vm, n);
+                    IR (n);
+                  }
+                else
+                  {
+                    /* split the nth iterable */
+                    switch (n->type)
+                      {
+                      case OBJ_ARRAY:
+                        {
+                          array_t *na = n->v.o_array.v;
+                          assert (na->len == i.b
+                                  && "Insufficient values to unpack");
+
+                          for (int j = i.b - 1; j > -1; j--)
+                            {
+                              obj_t *ji = na->vals[j];
+                              IR (ji);
+                              push (vm, ji);
+                            }
+                        }
+                        break;
+
+                      default:
+                        break;
+                      }
+                  }
+              }
           }
           break;
 
@@ -1430,7 +1549,7 @@ container_access (obj_t *o, char *name)
 
             oj->type = OBJ_HFF;
             oj->v.o_hff.f = r;
-            // IR (r);
+            IR (r);
 
             oj->v.o_hff.al = 1;
             oj->v.o_hff.args = SFMALLOC (sizeof (*oj->v.o_hff.args));
