@@ -91,3 +91,16 @@ sf_const_free (const_t *c)
       break;
     }
 }
+
+SF_API const_t
+sf_const_copy (const_t c)
+{
+  const_t d;
+  d.type = c.type;
+  d.v = c.v;
+
+  if (c.type == CONST_STRING)
+    d.v.c_str.v = SFSTRDUP (d.v.c_str.v);
+
+  return d;
+}

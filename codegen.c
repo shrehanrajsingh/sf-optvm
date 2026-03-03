@@ -222,7 +222,7 @@ sf_vm_gen_b_fromexpr (vm_t *vm, expr_t e)
             add_inst (vm, (instr_t){ .op = OP_LOAD_NAME,
                                      .a = v->pos,
                                      .b = lev,
-                                     .c = (char *)e.v.e_var.v });
+                                     .c = (char *)SFSTRDUP (e.v.e_var.v) });
           }
       }
       break;
@@ -260,7 +260,7 @@ sf_vm_gen_b_fromexpr (vm_t *vm, expr_t e)
                     vm->map_consts, vm->s_mc * sizeof (*vm->map_consts));
               }
 
-            vm->map_consts[vm->s_ml++] = d;
+            vm->map_consts[vm->s_ml++] = sf_const_copy (d);
 
             add_inst (vm, (instr_t){
                               .op = OP_LOAD_CONST,
@@ -370,7 +370,7 @@ sf_vm_gen_b_fromexpr (vm_t *vm, expr_t e)
         add_inst (vm, (instr_t){ .op = OP_DOT_ACCESS,
                                  .a = 0,
                                  .b = 0,
-                                 .c = e.v.e_dota.right });
+                                 .c = SFSTRDUP (e.v.e_dota.right) });
       }
       break;
 
@@ -482,18 +482,19 @@ sf_vm_gen_bytecode (vm_t *vm, StmtSM *smt)
                     add_inst (vm, (instr_t){ .op = OP_STORE_NAME,
                                              .a = v->pos,
                                              .b = 0,
-                                             .c = (char *)name->v.e_var.v });
+                                             .c = (char *)SFSTRDUP (
+                                                 name->v.e_var.v) });
                 }
                 break;
               case EXPR_DOT_ACCESS:
                 {
                   sf_vm_gen_b_fromexpr (vm, *name->v.e_dota.left);
 
-                  add_inst (vm,
-                            (instr_t){ .op = OP_STORE_NAME,
-                                       .a = 0,
-                                       .b = 1,
-                                       .c = (char *)name->v.e_dota.right });
+                  add_inst (vm, (instr_t){ .op = OP_STORE_NAME,
+                                           .a = 0,
+                                           .b = 1,
+                                           .c = (char *)SFSTRDUP (
+                                               name->v.e_dota.right) });
                 }
                 break;
 
@@ -742,7 +743,7 @@ sf_vm_gen_bytecode (vm_t *vm, StmtSM *smt)
                                 .op = OP_STORE_NAME,
                                 .a = nl->pos,
                                 .b = 0,
-                                .c = (char *)name,
+                                .c = (char *)SFSTRDUP (name),
                             });
           }
           break;
@@ -779,6 +780,8 @@ sf_vm_gen_bytecode (vm_t *vm, StmtSM *smt)
             csm.vals = body;
             csm.vl = csm.vc = bl;
 
+            vval_t *nl = add_var (vm, name);
+
             PRESERVE (vm);
 
             push_ht (vm);
@@ -790,8 +793,6 @@ sf_vm_gen_bytecode (vm_t *vm, StmtSM *smt)
             pop_ht (vm);
 
             RESTORE (vm);
-
-            vval_t *nl = add_var (vm, name);
 
             add_inst (vm, (instr_t){
                               .op = OP_LOAD_BUILDCLASS_END,
@@ -823,7 +824,7 @@ sf_vm_gen_bytecode (vm_t *vm, StmtSM *smt)
                                 .op = OP_STORE_NAME,
                                 .a = nl->pos,
                                 .b = 0,
-                                .c = (char *)name,
+                                .c = (char *)SFSTRDUP (name),
                             });
           }
           break;
@@ -874,10 +875,11 @@ sf_vm_gen_bytecode (vm_t *vm, StmtSM *smt)
                                     .b = 0,
                                 });
                 else if (v->slot == SF_VM_SLOT_NAME)
-                  add_inst (vm, (instr_t){ .op = OP_STORE_NAME,
-                                           .a = v->pos,
-                                           .b = 0,
-                                           .c = (char *)name->v.e_var.v });
+                  add_inst (vm, (instr_t){
+                                    .op = OP_STORE_NAME,
+                                    .a = v->pos,
+                                    .b = 0,
+                                    .c = (char *)SFSTRDUP (name->v.e_var.v) });
               }
 
             StmtSM smt;
@@ -943,7 +945,7 @@ sf_vm_gen_bytecode (vm_t *vm, StmtSM *smt)
               add_inst (vm, (instr_t){ .op = OP_STORE_NAME,
                                        .a = v->pos,
                                        .b = 0,
-                                       .c = (char *)alias });
+                                       .c = (char *)SFSTRDUP (alias) });
           }
           break;
 

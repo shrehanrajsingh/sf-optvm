@@ -23,6 +23,9 @@ enum ObjectType
   OBJ_ITER = 5,
   OBJ_HFF = 6, /* half function */
   OBJ_MOD = 7,
+  OBJ_MODHF = 8,    /* function in a module */
+  OBJ_MODHC = 9,    /* class in a module */
+  OBJ_MODWRAP = 10, /* wrapped in a mod frame */
 };
 
 typedef struct object_s
@@ -80,6 +83,27 @@ typedef struct object_s
       mod_t *v;
 
     } o_mod;
+
+    struct
+    {
+      struct object_s *f;
+      struct object_s *v;
+
+    } o_modhf;
+
+    struct
+    {
+      struct object_s *f; /* entity accessed */
+      struct object_s *v; /* parent in which entity is being searched */
+
+    } o_modcf;
+
+    struct
+    {
+      struct object_s *f; /* entity accessed */
+      struct _frame_s *v; /* parent in which entity is being searched */
+
+    } o_mw;
 
   } v;
 

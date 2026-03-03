@@ -90,6 +90,7 @@ typedef struct _frame_s
 
   size_t stack_base;
   int pop_ret_val; // 1: yes, 0: no
+  int is_mod;
 
 } frame_t;
 

@@ -1,4 +1,28 @@
-a = 0
+class BST
+    left = none
+    right = none
+    val = 0
 
-fun test (a)
-    putln (a)
+    fun _init (self, v)
+        self.val = v
+
+    fun insert (self, v)
+        if self.val < v
+            if self.right
+                self.right.insert (v)
+            else
+                self.right = BST (v)
+        else
+            if self.left
+                self.left.insert (v)
+            else
+                self.left = BST (v)
+
+    fun print (self)
+        putln (self.val)
+        
+        if self.left
+            self.left.print ()
+        
+        if self.right
+            self.right.print ()

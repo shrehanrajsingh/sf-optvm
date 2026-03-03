@@ -400,19 +400,19 @@ sf_token_free (token_t *t)
   switch (t->type)
     {
     case TOK_IDENTIFIER:
-      SFFREE (t->v.t_identifier.value);
+      SFFREE ((void *)t->v.t_identifier.value);
       break;
 
     case TOK_KEYWORD:
-      SFFREE (t->v.t_keyword.value);
+      SFFREE ((void *)t->v.t_keyword.value);
       break;
 
     case TOK_STRING:
-      SFFREE (t->v.t_string.value);
+      SFFREE ((void *)t->v.t_string.value);
       break;
 
     case TOK_OPERATOR:
-      SFFREE (t->v.t_operator.value);
+      SFFREE ((void *)t->v.t_operator.value);
       break;
 
     default:

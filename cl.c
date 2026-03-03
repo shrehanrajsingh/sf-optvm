@@ -9,6 +9,7 @@ sf_class_new ()
   c->vals = NULL;
   c->svl = 0;
   c->svc = 0;
+  c->par_fr = NULL;
 
   return c;
 }

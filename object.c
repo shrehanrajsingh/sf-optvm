@@ -183,10 +183,13 @@ sf_obj_free (obj_t *o, vm_t *vm)
     {
       mod_t *mo = o->v.o_mod.v;
 
-      SFFREE (mo->slots);
-
       for (int i = 0; i < mo->svl; i++)
-        DR (mo->vals[i], vm);
+        {
+          SFFREE (mo->slots[i]);
+          DR (mo->vals[i], vm);
+        }
+
+      SFFREE (mo->slots);
 
       SFFREE (mo->vals);
       SFFREE (mo->name);
@@ -307,6 +310,23 @@ sf_obj_free (obj_t *o, vm_t *vm)
       if (o->v.o_hff.args != NULL)
         SFFREE (o->v.o_hff.args);
       DR (o->v.o_hff.f, vm);
+    }
+
+  if (o->type == OBJ_MODHF)
+    {
+      DR (o->v.o_modhf.f, vm);
+      DR (o->v.o_modhf.v, vm);
+    }
+
+  if (o->type == OBJ_MODHC)
+    {
+      DR (o->v.o_modcf.f, vm);
+      DR (o->v.o_modcf.v, vm);
+    }
+
+  if (o->type == OBJ_MODWRAP)
+    {
+      DR (o->v.o_mw.f, vm);
     }
 
   if (osfil >= osfic)

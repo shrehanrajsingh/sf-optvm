@@ -4,6 +4,7 @@
 #include "header.h"
 #include "malloc.h"
 
+struct _frame_s;
 typedef struct __mod_s
 {
   char *name;
@@ -12,6 +13,7 @@ typedef struct __mod_s
   struct object_s **vals;
   size_t svl;
   size_t svc;
+  struct _frame_s *fr;
 
 } mod_t;
 

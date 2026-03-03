@@ -5,6 +5,7 @@
 #include "malloc.h"
 
 struct object_s;
+struct _frame_s;
 
 /**
  * Overview of how classes work in Sunflower
@@ -23,6 +24,7 @@ typedef struct __class_s
   struct object_s **vals;
   size_t svl;
   size_t svc;
+  struct _frame_s *par_fr;
 
 } class_t;
 

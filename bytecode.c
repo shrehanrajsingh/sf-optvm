@@ -371,10 +371,30 @@ start:;
         case OP_LOAD_NAME:
           {
             obj_t *o = NULL;
-            push (vm, o = fr->n.vals[i.a]);
 
-            if (o != NULL)
-              IR (o);
+            if (i.b == 0)
+              o = fr->n.vals[i.a];
+            else
+              {
+                int j = vm->fp - 1;
+                frame_t *ff = &vm->frames[j];
+
+                while (j > -1 && ff->type != FRAME_NAME)
+                  ff = &vm->frames[--j];
+
+                if (ff == NULL || j == -1)
+                  {
+                    printf ("name '%s' not found.", i.c);
+                    exit (EXIT_FAILURE);
+                  }
+
+                o = ff->n.vals[i.a];
+              }
+
+            assert (o != NULL);
+            push (vm, o);
+
+            IR (o);
           }
           break;
 
@@ -429,6 +449,16 @@ start:;
           {
             size_t argc = i.a;
             obj_t *name = pop (vm);
+            int saw_modwrap = 0;
+            obj_t *ppres = NULL;
+
+            if (name->type == OBJ_MODWRAP)
+              {
+                saw_modwrap = 1;
+                sf_vm_addframe (vm, *name->v.o_mw.v);
+                ppres = name;
+                name = name->v.o_mw.f;
+              }
 
             // IR (name);
 
@@ -794,9 +824,179 @@ start:;
                 }
                 break;
 
-              case OBJ_CLASS:
+              case OBJ_MODHF:
                 {
-                  class_t *c = name->v.o_class.v;
+                  sf_vm_addframe (vm, *name->v.o_modhf.v->v.o_mod.v->fr);
+
+                  fun_t *f = name->v.o_modhf.f->v.o_fun.v;
+                  assert (f->argl == argc);
+
+                  switch (f->type)
+                    {
+                    case FUN_NATIVE:
+                      {
+                        switch (f->v.native.nf_type)
+                          {
+                          case NF_ARG_1:
+                            {
+                              obj_t *r = f->v.native.v.f_onearg (args[0]);
+
+                              if (r != NULL)
+                                {
+                                  if (i.b != 1)
+                                    {
+                                      DR (r, vm);
+                                    }
+                                  else
+                                    {
+                                      push (vm, r);
+                                    }
+                                }
+                              else
+                                {
+                                  if (i.b == 1)
+                                    {
+                                      obj_t *o = sf_objstore_req_forconst (
+                                          &__sf_none_obj);
+
+                                      push (vm, o);
+                                    }
+                                }
+                            }
+                            break;
+
+                          case NF_ARG_2:
+                            {
+                              obj_t *r
+                                  = f->v.native.v.f_twoarg (args[0], args[1]);
+
+                              if (r != NULL)
+                                {
+                                  if (i.b != 1)
+                                    {
+                                      DR (r, vm);
+                                    }
+                                  else
+                                    {
+                                      push (vm, r);
+                                    }
+                                }
+                              else
+                                {
+                                  if (i.b == 1)
+                                    {
+                                      obj_t *o = sf_objstore_req_forconst (
+                                          &__sf_none_obj);
+                                    }
+                                }
+                            }
+                            break;
+
+                          case NF_ARG_3:
+                            {
+                              obj_t *r = f->v.native.v.f_threearg (
+                                  args[0], args[1], args[2]);
+
+                              if (r != NULL)
+                                {
+                                  if (i.b != 1)
+                                    {
+                                      DR (r, vm);
+                                    }
+                                  else
+                                    {
+                                      push (vm, r);
+                                    }
+                                }
+                              else
+                                {
+                                  if (i.b == 1)
+                                    {
+                                      obj_t *o = sf_objstore_req_forconst (
+                                          &__sf_none_obj);
+                                    }
+                                }
+                            }
+                            break;
+
+                          case NF_ARG_ANY:
+                            {
+                              obj_t *r = f->v.native.v.f_anyarg (args, al);
+
+                              if (r != NULL)
+                                {
+                                  if (i.b != 1)
+                                    {
+                                      DR (r, vm);
+                                    }
+                                  else
+                                    {
+                                      push (vm, r);
+                                    }
+                                }
+                              else
+                                {
+                                  if (i.b == 1)
+                                    {
+                                      obj_t *o = sf_objstore_req_forconst (
+                                          &__sf_none_obj);
+                                    }
+                                }
+                            }
+                            break;
+
+                          default:
+                            break;
+                          }
+
+                        for (size_t i = 0; i < al; i++)
+                          DR (args[i], vm);
+                      }
+                      break;
+
+                    case FUN_CODED:
+                      {
+                        size_t lp = f->v.coded.lp;
+
+                        for (size_t i = 0; i < al; i++)
+                          {
+                            push (vm, args[i]);
+                            // IR (args[i]);
+                          }
+
+                        frame_t frt = sf_frame_new_local ();
+                        frt.return_ip = vm->ip;
+                        // D (printf ("%d\n", fr.return_ip));
+                        frt.stack_base = vm->sp;
+
+                        // fr = &vm->frames[vm->fp - 1];
+                        vm->ip = lp;
+
+                        if (i.b == 1)
+                          frt.pop_ret_val = 0; /* need return value */
+                        else
+                          frt.pop_ret_val
+                              = 1; /* dont need return value (stmt call) */
+
+                        sf_vm_addframe (vm, frt);
+                        sf_vm_exec_single_frame (vm);
+                        sf_vm_popframe (vm);
+                      }
+                      break;
+
+                    default:
+                      break;
+                    }
+
+                  vm->fp--;
+                }
+                break;
+
+              case OBJ_MODHC:
+                {
+                  sf_vm_addframe (vm, *name->v.o_modcf.v->v.o_mod.v->fr);
+
+                  class_t *c = name->v.o_modcf.f->v.o_class.v;
                   cobj_t *co = sf_cobj_new (c);
 
                   obj_t *o = sf_objstore_req ();
@@ -814,6 +1014,17 @@ start:;
                   obj_t *_init_method = container_access (o, "_init");
                   if (_init_method != NULL)
                     {
+                      int smw = 0;
+                      obj_t *ppres = NULL;
+
+                      if (_init_method->type == OBJ_MODWRAP)
+                        {
+                          smw = 1;
+                          sf_vm_addframe (vm, *_init_method->v.o_mw.v);
+                          ppres = _init_method;
+                          _init_method = _init_method->v.o_mw.f;
+                        }
+
                       assert (_init_method->type == OBJ_HFF);
                       obj_t *hfo = _init_method->v.o_hff.f;
 
@@ -851,6 +1062,95 @@ start:;
                           D (printf ("[TODO] native function as an _init"));
                         }
 
+                      if (smw)
+                        {
+                          _init_method = ppres;
+                          vm->fp--;
+                        }
+
+                      /* resolve r-values */
+                      IR (_init_method);
+                      DR (_init_method, vm);
+                    }
+
+                  vm->fp--;
+                }
+                break;
+
+              case OBJ_CLASS:
+                {
+                  class_t *c = name->v.o_class.v;
+                  cobj_t *co = sf_cobj_new (c);
+
+                  obj_t *o = sf_objstore_req ();
+                  o->type = OBJ_COBJ;
+                  o->v.o_cobj.v = co;
+
+                  if (i.b == 1)
+                    {
+                      push (vm, o);
+                      IR (o);
+                    }
+                  // else
+                  //   sf_cobj_free (co);
+
+                  obj_t *_init_method = container_access (o, "_init");
+                  if (_init_method != NULL)
+                    {
+                      int smw = 0;
+                      obj_t *ppres = NULL;
+
+                      if (_init_method->type == OBJ_MODWRAP)
+                        {
+                          smw = 1;
+                          sf_vm_addframe (vm, *_init_method->v.o_mw.v);
+                          ppres = _init_method;
+                          _init_method = _init_method->v.o_mw.f;
+                        }
+
+                      assert (_init_method->type == OBJ_HFF);
+                      obj_t *hfo = _init_method->v.o_hff.f;
+
+                      assert (hfo->type == OBJ_FUNC);
+                      fun_t *f = hfo->v.o_fun.v;
+
+                      if (f->type == FUN_CODED)
+                        {
+                          assert (f->argl == al + 1);
+                          size_t lp = f->v.coded.lp;
+
+                          for (size_t i = 0; i < al; i++)
+                            {
+                              push (vm, args[i]);
+                              // IR (args[i]);
+                            }
+
+                          push (vm, o);
+                          IR (o);
+
+                          frame_t frt = sf_frame_new_local ();
+                          frt.return_ip = vm->ip;
+                          // D (printf ("%d\n", fr.return_ip));
+                          frt.stack_base = vm->sp;
+                          frt.pop_ret_val = 1;
+
+                          sf_vm_addframe (vm, frt);
+                          vm->ip = lp;
+
+                          sf_vm_exec_single_frame (vm);
+                          sf_vm_popframe (vm);
+                        }
+                      else if (f->type == FUN_NATIVE)
+                        {
+                          D (printf ("[TODO] native function as an _init"));
+                        }
+
+                      if (smw)
+                        {
+                          _init_method = ppres;
+                          vm->fp--;
+                        }
+
                       /* resolve r-values */
                       IR (_init_method);
                       DR (_init_method, vm);
@@ -860,6 +1160,12 @@ start:;
 
               default:
                 break;
+              }
+
+            if (saw_modwrap)
+              {
+                name = ppres;
+                vm->fp--;
               }
 
             DR (name, vm);
@@ -1095,6 +1401,12 @@ start:;
             cl->svl = f.n.nvl;
             cl->svc = f.n.nvl;
 
+            frame_t *ff = &vm->frames[vm->fp - 2];
+            if (ff->type == FRAME_NAME && ff->is_mod)
+              {
+                cl->par_fr = ff;
+              }
+
             // cl->slots = SFMALLOC (sizeof (*cl->slots));
             // cl->vals = SFMALLOC (sizeof (*cl->vals));
 
@@ -1109,12 +1421,15 @@ start:;
 
             for (size_t j = 0; j < f.n.nvl; j++)
               {
+                if (f.n.names[j] == NULL)
+                  continue;
+
                 cl->slots[j] = SFSTRDUP (f.n.names[j]);
                 cl->vals[j] = f.n.vals[j];
                 IR (f.n.vals[j]);
               }
 
-            cl->name = vm->insts[i.a].c;
+            cl->name = SFSTRDUP (vm->insts[i.a].c);
 
             obj_t *o = sf_objstore_req ();
             o->type = OBJ_CLASS;
@@ -1122,6 +1437,8 @@ start:;
 
             push (vm, o);
             IR (o);
+
+            sf_vm_popframe (vm);
 
             goto end2;
           }
@@ -1332,6 +1649,32 @@ start:;
             //     sf_token_print (smt->vals[i]);
             //   }
 
+            // frame_t *frms = vm->frames;
+            // size_t frc = vm->frame_cap;
+            // size_t vmfp = vm->fp;
+
+            // obj_t **gp = vm->globals;
+            // hashtable_t **hts = vm->hts;
+            // size_t htl = vm->htl;
+
+            // vm->globals = SFMALLOC (vm->globals_cap * sizeof
+            // (*vm->globals));
+
+            // for (size_t i = 0; i < vm->globals_cap; i++)
+            //   vm->globals[i] = NULL;
+
+            // vm->htl = 1;
+            // vm->hts = SFMALLOC (vm->htc * sizeof (*vm->hts));
+            // vm->hts[0] = sf_ht_new ();
+
+            // for (size_t i = vm->htl; i < vm->htc; i++)
+            //   vm->hts[i] = NULL;
+
+            // vm->frames = SFMALLOC (vm->frame_cap * sizeof (*vm->frames));
+            // vm->fp = 0;
+
+            // sf_natives_add_tovm (vm);
+
             StmtSM *stt = sf_ast_gen (smt);
             stmt_t *stt_vals = stt->vals;
 
@@ -1422,9 +1765,13 @@ start:;
             vm->meta.slot = SF_VM_SLOT_NAME;
             sf_vm_gen_bytecode (vm, stt);
 
+            // for (size_t i = ip; i < vm->inst_len; i++)
+            //   sf_vm_print_inst (vm->insts[i]);
+
             RESTORE (vm);
 
             frame_t fr = sf_frame_new_name ();
+            fr.is_mod = 1;
             fr.pop_ret_val = 1;
             fr.return_ip = vm->ip;
             fr.stack_base = vm->sp;
@@ -1448,6 +1795,9 @@ start:;
 
             for (int i = 0; i < bf->n.nvl; i++)
               {
+                if (bf->n.names[i] == NULL)
+                  continue;
+
                 mod->slots[i] = SFSTRDUP (bf->n.names[i]);
                 mod->vals[i] = bf->n.vals[i];
                 IR (mod->vals[i]);
@@ -1466,7 +1816,18 @@ start:;
             IR (o);
             sf_modstore_add (vm->mod_store, vm->ip, o);
 
-            sf_vm_framefree (bf, vm);
+            vm->fp--;
+            mod->fr = bf;
+
+            // for (size_t i = 0; i < mod->fr->n.nvl; i++)
+            //   D (printf ("%s\n", mod->fr->n.names[i]));
+
+            // vm->frames = frms;
+            // vm->frame_cap = frc;
+            // vm->fp = vmfp;
+            // vm->globals = gp;
+            // vm->hts = hts;
+            // vm->htl = htl;
 
             SFFREE (buf);
 
@@ -1618,6 +1979,7 @@ sf_frame_new_local ()
   f.l.locals_count = 0;
   f.l.locals = SFMALLOC (f.l.locals_cap * sizeof (*f.l.locals));
   f.stack_base = 0;
+  f.is_mod = 0;
 
   for (int i = 0; i < f.l.locals_cap; i++)
     f.l.locals[i] = NULL;
@@ -1636,6 +1998,7 @@ sf_frame_new_name ()
   f.n.vals = SFMALLOC (f.n.nvc * sizeof (*f.n.vals));
   f.n.names = SFMALLOC (f.n.nvc * sizeof (*f.n.names));
   f.stack_base = 0;
+  f.is_mod = 0;
 
   for (int i = 0; i < f.n.nvc; i++)
     f.n.vals[i] = NULL;
@@ -1736,9 +2099,30 @@ container_access (obj_t *o, char *name)
       {
         class_t *c = o->v.o_class.v;
 
-        for (int i = 0; i < c->svl; i++)
-          if (!strcmp (c->slots[i], name))
-            return c->vals[i];
+        if (c->par_fr == NULL)
+          {
+            for (int i = 0; i < c->svl; i++)
+              if (!strcmp (c->slots[i], name))
+                return c->vals[i];
+          }
+        else
+          {
+            obj_t *r = NULL;
+
+            for (int i = 0; i < c->svl; i++)
+              {
+                if (!strcmp (c->slots[i], name))
+                  {
+                    r = c->vals[i];
+                    break;
+                  }
+              }
+
+            obj_t *j = sf_objstore_req ();
+            j->type = OBJ_MODWRAP;
+            j->v.o_mw.v = c->par_fr;
+            j->v.o_mw.f = r;
+          }
       }
       break;
 
@@ -1783,7 +2167,20 @@ container_access (obj_t *o, char *name)
             *oj->v.o_hff.args = o;
             IR (o);
 
-            return oj;
+            class_t *cp = c->p;
+
+            if (cp->par_fr != NULL)
+              {
+                obj_t *oo = sf_objstore_req ();
+                oo->type = OBJ_MODWRAP;
+                oo->v.o_mw.v = cp->par_fr;
+                oo->v.o_mw.f = oj;
+
+                IR (oj);
+                return oo;
+              }
+            else
+              return oj;
           }
         else
           return r;
@@ -1794,14 +2191,45 @@ container_access (obj_t *o, char *name)
       {
         mod_t *mo = o->v.o_mod.v;
 
+        obj_t *r = NULL;
         for (size_t i = 0; i < mo->svl; i++)
           {
             // D (printf ("(%s)\n", mo->slots[i]));
             if (!strcmp (mo->slots[i], name))
               {
-                return mo->vals[i];
+                r = mo->vals[i];
+                break;
               }
           }
+
+        if (r != NULL && r->type == OBJ_FUNC)
+          {
+            obj_t *oj = sf_objstore_req ();
+
+            oj->type = OBJ_MODHF;
+            oj->v.o_modhf.f = r;
+            oj->v.o_modhf.v = o;
+
+            IR (r);
+            IR (o);
+
+            return oj;
+          }
+        else if (r != NULL && r->type == OBJ_CLASS)
+          {
+            obj_t *oj = sf_objstore_req ();
+
+            oj->type = OBJ_MODHC;
+            oj->v.o_modcf.f = r;
+            oj->v.o_modcf.v = o;
+
+            IR (r);
+            IR (o);
+
+            return oj;
+          }
+        else
+          return r;
       }
       break;
 
