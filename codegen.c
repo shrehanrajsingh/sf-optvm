@@ -80,6 +80,7 @@ pop_ht (vm_t *vm)
     return;
 
   sf_ht_free (vm->hts[--vm->htl]);
+  vm->hts[vm->htl] = NULL;
 }
 
 int
@@ -116,18 +117,6 @@ const_eqeq (const_t c, const_t d)
 
   return 0;
 }
-
-#define PRESERVE(vm)                                                          \
-  size_t _pres_g_slot = (vm)->meta.g_slot;                                    \
-  size_t _pres_l_slot = (vm)->meta.l_slot;                                    \
-  size_t _pres_n_slot = (vm)->meta.n_slot;                                    \
-  size_t _pres_slot = (vm)->meta.slot;
-
-#define RESTORE(vm)                                                           \
-  vm->meta.g_slot = _pres_g_slot;                                             \
-  vm->meta.l_slot = _pres_l_slot;                                             \
-  vm->meta.n_slot = _pres_n_slot;                                             \
-  vm->meta.slot = _pres_slot;
 
 static vval_t *
 get_var (vm_t *vm, const char *name, int *level_ptr)
@@ -914,6 +903,47 @@ sf_vm_gen_bytecode (vm_t *vm, StmtSM *smt)
             // D (printf ("%d\n", vm->inst_len));
 
             vm->insts[jl].a = vm->inst_len;
+          }
+          break;
+
+        case STMT_IMPORT:
+          {
+            const char *alias = s->v.s_import.alias;
+            const char *path = s->v.s_import.path;
+
+            add_inst (vm, (instr_t){
+                              .op = OP_IMPORT,
+                              .a = 0,
+                              .b = 0,
+                              .c = path,
+                          });
+
+            add_inst (vm, (instr_t){
+                              .op = OP_IMPORT_ALIAS,
+                              .a = 0,
+                              .b = 0,
+                              .c = alias,
+                          });
+
+            vval_t *v = add_var (vm, (char *)alias);
+
+            if (v->slot == SF_VM_SLOT_LOCAL)
+              add_inst (vm, (instr_t){
+                                .op = OP_STORE_FAST,
+                                .a = v->pos,
+                                .b = 0,
+                            });
+            else if (v->slot == SF_VM_SLOT_GLOBAL)
+              add_inst (vm, (instr_t){
+                                .op = OP_STORE,
+                                .a = v->pos,
+                                .b = 0,
+                            });
+            else if (v->slot == SF_VM_SLOT_NAME)
+              add_inst (vm, (instr_t){ .op = OP_STORE_NAME,
+                                       .a = v->pos,
+                                       .b = 0,
+                                       .c = (char *)alias });
           }
           break;
 

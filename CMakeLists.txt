@@ -26,5 +26,7 @@ add_library(sunflower
     cl.h cl.c
     array.h array.c
     iter.h iter.c
+    natives.h natives.c
+    mod.h mod.c
     sunflower.h sunflower.c)
 

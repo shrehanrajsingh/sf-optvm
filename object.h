@@ -8,19 +8,21 @@
 #include "header.h"
 #include "iter.h"
 #include "malloc.h"
+#include "mod.h"
 #include "mut.h"
 
 struct _vm_s;
 
 enum ObjectType
 {
-  OBJ_CONST,
-  OBJ_FUNC,
-  OBJ_CLASS,
-  OBJ_COBJ,
-  OBJ_ARRAY,
-  OBJ_ITER,
-  OBJ_HFF, /* half function */
+  OBJ_CONST = 0,
+  OBJ_FUNC = 1,
+  OBJ_CLASS = 2,
+  OBJ_COBJ = 3,
+  OBJ_ARRAY = 4,
+  OBJ_ITER = 5,
+  OBJ_HFF = 6, /* half function */
+  OBJ_MOD = 7,
 };
 
 typedef struct object_s
@@ -73,6 +75,12 @@ typedef struct object_s
 
     } o_iter;
 
+    struct
+    {
+      mod_t *v;
+
+    } o_mod;
+
   } v;
 
   struct
@@ -90,9 +98,9 @@ typedef struct object_s
     sf_obj_rc_inc ((X));                                                      \
   }
 
-#define DR(X, Y)                                                              \
+#define DR(X, VM)                                                             \
   {                                                                           \
-    sf_obj_rc_dec ((X), (Y));                                                 \
+    sf_obj_rc_dec ((X), (VM));                                                \
   }
 
 #if defined(__cplusplus)

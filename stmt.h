@@ -7,14 +7,15 @@
 
 enum StmtType
 {
-  STMT_VARDECL,
-  STMT_FUNCALL,
-  STMT_IFBLOCK,
-  STMT_WHILE,
-  STMT_FUNDECL,
-  STMT_RETURN,
-  STMT_CLASSDECL,
-  STMT_FOR,
+  STMT_VARDECL = 0,
+  STMT_FUNCALL = 1,
+  STMT_IFBLOCK = 2,
+  STMT_WHILE = 3,
+  STMT_FUNDECL = 4,
+  STMT_RETURN = 5,
+  STMT_CLASSDECL = 6,
+  STMT_FOR = 7,
+  STMT_IMPORT = 8,
   STMT_EOF
 };
 
@@ -95,6 +96,13 @@ typedef struct __stmt_s
 
     } s_for;
 
+    struct
+    {
+      const char *path;
+      const char *alias;
+
+    } s_import;
+
   } v;
 
 } stmt_t;
@@ -115,6 +123,7 @@ extern "C"
 #endif // __cplusplus
 
   SF_API void sf_stmt_print (stmt_t);
+  SF_API void sf_stmt_free (stmt_t *);
 
 #if defined(__cplusplus)
 }

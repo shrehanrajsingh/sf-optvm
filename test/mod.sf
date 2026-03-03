@@ -1,0 +1,4 @@
+a = 0
+
+fun test (a)
+    putln (a)

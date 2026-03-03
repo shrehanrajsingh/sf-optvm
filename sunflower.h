@@ -3,6 +3,7 @@
 
 #include "ast.h"
 #include "bytecode.h"
+#include "cl.h"
 #include "codegen.h"
 #include "const.h"
 #include "expr.h"
@@ -10,6 +11,7 @@
 #include "ht.h"
 #include "malloc.h"
 #include "mut.h"
+#include "natives.h"
 #include "object.h"
 #include "stmt.h"
 #include "token.h"

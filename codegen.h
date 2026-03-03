@@ -10,6 +10,24 @@
 #include "object.h"
 #include "stmt.h"
 
+#if !defined(PRESERVE)
+#define PRESERVE(vm)                                                          \
+  size_t _pres_g_slot = (vm)->meta.g_slot;                                    \
+  size_t _pres_l_slot = (vm)->meta.l_slot;                                    \
+  size_t _pres_n_slot = (vm)->meta.n_slot;                                    \
+  size_t _pres_slot = (vm)->meta.slot;
+
+#endif // PRESERVE
+
+#if !defined(RESTORE)
+#define RESTORE(vm)                                                           \
+  vm->meta.g_slot = _pres_g_slot;                                             \
+  vm->meta.l_slot = _pres_l_slot;                                             \
+  vm->meta.n_slot = _pres_n_slot;                                             \
+  vm->meta.slot = _pres_slot;
+
+#endif // RESTORE
+
 #if defined(__cplusplus)
 extern "C"
 {

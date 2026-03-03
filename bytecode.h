@@ -13,35 +13,37 @@
 
 typedef enum OpcodeType
 {
-  OP_LOAD_CONST,
-  OP_LOAD_FAST, /* local var */
-  OP_LOAD,
-  OP_STORE,
-  OP_STORE_FAST,
-  OP_STORE_NAME,
-  OP_STORE_SQR,
-  OP_CALL,
-  OP_ADD_1,
-  OP_ADD,
-  OP_SUB,
-  OP_MUL,
-  OP_DIV,
-  OP_JUMP,
-  OP_JUMP_IF_FALSE,
-  OP_LOAD_FUNC_CODED,
-  OP_CMP,
-  OP_LOAD_BUILDCLASS,
-  OP_LOAD_BUILDCLASS_END,
-  OP_LOAD_NAME,
-  OP_DOT_ACCESS,
-  OP_LOAD_ARRAY,
-  OP_SQR_ACCESS,
-  OP_RANGE_FAST,
-  OP_GET_ITER,
-  OP_LOAD_ITER_NEXT,
+  OP_LOAD_CONST = 0,
+  OP_LOAD_FAST = 1, /* local var */
+  OP_LOAD = 2,
+  OP_STORE = 3,
+  OP_STORE_FAST = 4,
+  OP_STORE_NAME = 5,
+  OP_STORE_SQR = 6,
+  OP_CALL = 7,
+  OP_ADD_1 = 8,
+  OP_ADD = 9,
+  OP_SUB = 10,
+  OP_MUL = 11,
+  OP_DIV = 12,
+  OP_JUMP = 13,
+  OP_JUMP_IF_FALSE = 14,
+  OP_LOAD_FUNC_CODED = 15,
+  OP_CMP = 16,
+  OP_LOAD_BUILDCLASS = 17,
+  OP_LOAD_BUILDCLASS_END = 18,
+  OP_LOAD_NAME = 19,
+  OP_DOT_ACCESS = 20,
+  OP_LOAD_ARRAY = 21,
+  OP_SQR_ACCESS = 22,
+  OP_RANGE_FAST = 23,
+  OP_GET_ITER = 24,
+  OP_LOAD_ITER_NEXT = 25,
   //   OP_STACK_POP,
   //   OP_STACK_PUSH,
-  OP_RETURN
+  OP_RETURN = 26,
+  OP_IMPORT = 27,
+  OP_IMPORT_ALIAS = 28,
 
 } opcode_t;
 
@@ -125,6 +127,8 @@ typedef struct _vm_s
   frame_t *frames;
   size_t fp;
   size_t frame_cap;
+
+  modstore_t *mod_store;
 
   struct
   {

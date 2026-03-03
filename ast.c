@@ -425,6 +425,8 @@ sf_ast_gen (TokenSM *smt)
                     st.v.s_ifblock.else_body = eb_smt->vals;
                     st.v.s_ifblock.else_bl = eb_smt->vl;
                     smtv = ebe;
+
+                    SFFREE (eb_smt);
                   }
 
                 if (cond->type == EXPR_CONST)
@@ -474,6 +476,8 @@ sf_ast_gen (TokenSM *smt)
                   }
                 else
                   res->vals[res->vl++] = st;
+
+                SFFREE (body_smt);
                 // for (int i = 0; i < body_smt->vl; i++)
                 //   sf_stmt_print (body_smt->vals[i]);
               }
@@ -544,6 +548,8 @@ sf_ast_gen (TokenSM *smt)
 
                 smtv = block_end;
                 res->vals[res->vl++] = st;
+
+                SFFREE (body_smt);
               }
             else if (!strcmp (kw, "for"))
               {
@@ -671,6 +677,8 @@ sf_ast_gen (TokenSM *smt)
 
                 smtv = block_end;
                 res->vals[res->vl++] = st;
+
+                SFFREE (body_smt);
               }
             else if (!strcmp (kw, "fun"))
               {
@@ -777,6 +785,8 @@ sf_ast_gen (TokenSM *smt)
 
                 smtv = block_end;
                 res->vals[res->vl++] = st;
+
+                SFFREE (body_smt);
               }
             else if (!strcmp (kw, "return"))
               {
@@ -875,6 +885,28 @@ sf_ast_gen (TokenSM *smt)
 
                 res->vals[res->vl++] = st;
                 smtv = block_end;
+
+                SFFREE (body_smt);
+              }
+            else if (!strcmp (kw, "import"))
+              {
+                assert (smtv->type == TOK_STRING);
+                const char *path = smtv->v.t_string.value;
+
+                tok = *++smtv;
+                assert (tok.type == TOK_KEYWORD
+                        && !strcmp (tok.v.t_keyword.value, "as"));
+
+                tok = *++smtv;
+                assert (tok.type == TOK_IDENTIFIER);
+                const char *alias = tok.v.t_identifier.value;
+
+                stmt_t st;
+                st.type = STMT_IMPORT;
+                st.v.s_import.alias = alias;
+                st.v.s_import.path = path;
+
+                res->vals[res->vl++] = st;
               }
           }
           break;

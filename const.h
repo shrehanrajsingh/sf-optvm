@@ -53,6 +53,7 @@ extern "C"
   SF_API const_t sf_const_str_new (const char *);
   SF_API const_t sf_const_bool_new (int);
   SF_API void sf_const_print (const_t);
+  SF_API void sf_const_free (const_t *);
 
 #if defined(__cplusplus)
 }

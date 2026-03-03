@@ -10,6 +10,9 @@ sf_statem_token_new (char *r)
   smt->vc = SF_TOKEN_STATEM_VALS_CAP;
   smt->vals = SFMALLOC (smt->vc * sizeof (*smt->vals));
 
+  for (size_t i = 0; i < smt->vc; i++)
+    smt->vals[i].type = -1;
+
   return smt;
 }
 
@@ -388,5 +391,31 @@ sf_tokensm_print (TokenSM *smt)
   for (size_t i = 0; i < smt->vl; i++)
     {
       sf_token_print (smt->vals[i]);
+    }
+}
+
+SF_API void
+sf_token_free (token_t *t)
+{
+  switch (t->type)
+    {
+    case TOK_IDENTIFIER:
+      SFFREE (t->v.t_identifier.value);
+      break;
+
+    case TOK_KEYWORD:
+      SFFREE (t->v.t_keyword.value);
+      break;
+
+    case TOK_STRING:
+      SFFREE (t->v.t_string.value);
+      break;
+
+    case TOK_OPERATOR:
+      SFFREE (t->v.t_operator.value);
+      break;
+
+    default:
+      break;
     }
 }

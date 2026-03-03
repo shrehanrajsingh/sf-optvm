@@ -94,6 +94,7 @@ extern "C"
   SF_API void sf_statem_token_free (TokenSM *);
   SF_API void sf_token_print (token_t);
   SF_API void sf_tokensm_print (TokenSM *);
+  SF_API void sf_token_free (token_t *);
 
 #if defined(__cplusplus)
 }

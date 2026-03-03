@@ -150,9 +150,13 @@ sf_obj_free (obj_t *o, vm_t *vm)
 {
   o->meta.active = 0;
 
-  if (o->type == OBJ_FUNC && o->v.o_fun.v->type == FUN_CODED)
+  if (o->type == OBJ_FUNC)
     {
-      SFFREE (o->v.o_fun.v);
+      if (o->v.o_fun.v != NULL)
+        {
+          sf_fun_free (o->v.o_fun.v);
+          o->v.o_fun.v = NULL;
+        }
     }
 
   if (o->type == OBJ_ARRAY)
@@ -173,6 +177,20 @@ sf_obj_free (obj_t *o, vm_t *vm)
   if (o->type == OBJ_ITER)
     {
       DR (o->v.o_iter.v.o, vm);
+    }
+
+  if (o->type == OBJ_MOD)
+    {
+      mod_t *mo = o->v.o_mod.v;
+
+      SFFREE (mo->slots);
+
+      for (int i = 0; i < mo->svl; i++)
+        DR (mo->vals[i], vm);
+
+      SFFREE (mo->vals);
+      SFFREE (mo->name);
+      SFFREE (mo);
     }
 
   if (o->type == OBJ_COBJ)
@@ -297,6 +315,7 @@ sf_obj_free (obj_t *o, vm_t *vm)
       os_freeidxs = SFREALLOC (os_freeidxs, osfic * sizeof (*os_freeidxs));
     }
 
+  o->type = -1;
   os_freeidxs[osfil++] = o->meta.index;
 }
 
@@ -402,6 +421,10 @@ sf_obj_print (obj_t o)
 
     case OBJ_ITER:
       printf ("<iter object '%p'>", o);
+      break;
+
+    case OBJ_MOD:
+      printf ("<module '%s' at %p>", o.v.o_mod.v->name, o);
       break;
 
     default:

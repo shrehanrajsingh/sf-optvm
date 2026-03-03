@@ -17,6 +17,11 @@ __sf_malloc (size_t size)
 SF_API void *
 __sf_realloc (void *old, size_t ns)
 {
+  if (old == NULL)
+    {
+      return __sf_malloc (ns);
+    }
+
   void *p = realloc (old, ns);
 
   if (p == NULL)

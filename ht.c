@@ -30,7 +30,11 @@ ht_init_table (hashtable_t *ht, size_t cap)
 
   ht->vals = SFMALLOC (ht->cap * sizeof (*ht->vals));
   for (size_t i = 0; i < ht->cap; i++)
-    ht->vals[i].state = HT_EMPTY;
+    {
+      ht->vals[i].state = HT_EMPTY;
+      ht->vals[i].name = NULL;
+      ht->vals[i].val = NULL;
+    }
 
   ht->fast.c = 0;
 }
@@ -78,10 +82,18 @@ sf_ht_new (void)
 SF_API void
 sf_ht_free (hashtable_t *ht)
 {
+  for (size_t i = 0; i < ht->fast.c; i++)
+    {
+      SFFREE (ht->fast.vals[i]);
+    }
+
   for (size_t i = 0; i < ht->cap; i++)
     {
-      if (ht->vals[i].state == HT_ACTIVE)
-        SFFREE (ht->vals[i].name);
+      if (ht->vals[i].val != NULL)
+        {
+          // SFFREE (ht->vals[i].name);
+          SFFREE (ht->vals[i].val);
+        }
     }
 
   SFFREE (ht->vals);

@@ -7,16 +7,16 @@
 
 enum ExprType
 {
-  EXPR_CONST,
-  EXPR_VAR,
-  EXPR_ADD_1,
-  EXPR_ARITHMETIC,
-  EXPR_FUNCALL,
-  EXPR_CMP,
-  EXPR_DOT_ACCESS,
-  EXPR_ARRAY,
-  EXPR_SQUARE_ACCESS,
-  EXPR_TO_STEP,
+  EXPR_CONST = 0,
+  EXPR_VAR = 1,
+  EXPR_ADD_1 = 2,
+  EXPR_ARITHMETIC = 3,
+  EXPR_FUNCALL = 4,
+  EXPR_CMP = 5,
+  EXPR_DOT_ACCESS = 6,
+  EXPR_ARRAY = 7,
+  EXPR_SQUARE_ACCESS = 8,
+  EXPR_TO_STEP = 9,
   EXPR_COUNT
 };
 
@@ -121,6 +121,7 @@ extern "C"
 
   SF_API void sf_expr_print (expr_t);
   SF_API int sf_expr_tobool (expr_t);
+  SF_API void sf_expr_free (expr_t *);
 
 #if defined(__cplusplus)
 }

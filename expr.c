@@ -190,3 +190,113 @@ sf_expr_tobool (expr_t e)
 
   return r;
 }
+
+SF_API void
+sf_expr_free (expr_t *e)
+{
+  if (e == NULL)
+    return;
+
+  switch (e->type)
+    {
+    case EXPR_ADD_1:
+      sf_expr_free (e->v.e_add_one.v);
+      SFFREE (e->v.e_add_one.v);
+      break;
+
+    case EXPR_ARITHMETIC:
+      {
+        arith_node_t *nodes = e->v.e_arith.tree;
+
+        for (size_t i = 0; i < e->v.e_arith.tl; i++)
+          {
+            if (nodes[i].type == ARITH_NODE_E_O)
+              {
+                sf_expr_free (nodes[i].v.expr);
+                SFFREE (nodes[i].v.expr);
+              }
+          }
+
+        SFFREE (nodes);
+      }
+      break;
+
+    case EXPR_ARRAY:
+      {
+        for (size_t i = 0; i < e->v.e_array.vl; i++)
+          {
+            sf_expr_free (e->v.e_array.vals[i]);
+            SFFREE (e->v.e_array.vals[i]);
+          }
+
+        SFFREE (e->v.e_array.vals);
+      }
+      break;
+
+    case EXPR_CMP:
+      {
+        sf_expr_free (e->v.e_cmp.left);
+        sf_expr_free (e->v.e_cmp.right);
+
+        SFFREE (e->v.e_cmp.left);
+        SFFREE (e->v.e_cmp.right);
+      }
+      break;
+
+    case EXPR_CONST:
+      sf_const_free (&e->v.e_const.v);
+      break;
+
+    case EXPR_DOT_ACCESS:
+      sf_expr_free (e->v.e_dota.left);
+      SFFREE (e->v.e_dota.left);
+      SFFREE (e->v.e_dota.right);
+      break;
+
+    case EXPR_FUNCALL:
+      {
+        sf_expr_free (e->v.e_funcall.name);
+        SFFREE (e->v.e_funcall.name);
+
+        for (size_t i = 0; i < e->v.e_funcall.al; i++)
+          {
+            sf_expr_free (e->v.e_funcall.args[i]);
+            SFFREE (e->v.e_funcall.args[i]);
+          }
+
+        SFFREE (e->v.e_funcall.args);
+      }
+      break;
+
+    case EXPR_SQUARE_ACCESS:
+      {
+        sf_expr_free (e->v.e_sqr_access.idx);
+        sf_expr_free (e->v.e_sqr_access.parent);
+
+        SFFREE (e->v.e_sqr_access.idx);
+        SFFREE (e->v.e_sqr_access.parent);
+      }
+      break;
+
+    case EXPR_TO_STEP:
+      {
+        sf_expr_free (e->v.e_to_step.lval);
+        sf_expr_free (e->v.e_to_step.rval);
+        sf_expr_free (e->v.e_to_step.step);
+
+        SFFREE (e->v.e_to_step.lval);
+        SFFREE (e->v.e_to_step.rval);
+        SFFREE (e->v.e_to_step.step);
+      }
+      break;
+
+    case EXPR_VAR:
+      // here;
+      // D (printf ("%s\n", e->v.e_var.v));
+      SFFREE ((void *)e->v.e_var.v);
+      break;
+
+    default:
+      break;
+    }
+}

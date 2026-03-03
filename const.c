@@ -65,3 +65,29 @@ sf_const_print (const_t c)
       break;
     }
 }
+
+SF_API void
+sf_const_free (const_t *c)
+{
+  switch (c->type)
+    {
+    case CONST_INT:
+      break;
+
+    case CONST_BOOL:
+      break;
+
+    case CONST_FLOAT:
+      break;
+
+    case CONST_NONE:
+      break;
+
+    case CONST_STRING:
+      SFFREE (c->v.c_str.v);
+      break;
+
+    default:
+      break;
+    }
+}
