@@ -127,6 +127,21 @@ typedef struct object_s
     sf_obj_rc_dec ((X), (VM));                                                \
   }
 
+#define OBJ_IS_INT(X)                                                         \
+  ((X)->type == OBJ_CONST && (X)->v.o_const.v.type == CONST_INT)
+
+#define OBJ_IS_FLOAT(X)                                                       \
+  ((X)->type == OBJ_CONST && (X)->v.o_const.v.type == CONST_FLOAT)
+
+#define OBJ_IS_STRING(X)                                                      \
+  ((X)->type == OBJ_CONST && (X)->v.o_const.v.type == CONST_STRING)
+
+#define OBJ_IS_NONE(X)                                                        \
+  ((X)->type == OBJ_CONST && (X)->v.o_const.v.type == CONST_NONE)
+
+#define OBJ_IS_BOOL(X)                                                        \
+  ((X)->type == OBJ_CONST && (X)->v.o_const.v.type == CONST_BOOL)
+
 #if defined(__cplusplus)
 extern "C"
 {

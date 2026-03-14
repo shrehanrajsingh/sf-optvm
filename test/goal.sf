@@ -120,7 +120,7 @@ toh (3, 'S', 'D', 'A')
 fun greet (name)
     return 'Hello and good afternoon ' + name
 
-fun introduce (name, age)
+fun introduce_self (name, age)
     return 'Hello, my name is ' + name
 
 putln (greet ('Shrehan'))
@@ -135,13 +135,10 @@ class Student
         self.age = age
     
     fun introduce (self)
-        # calls parent method
-        putln (introduce (self.name, self.age))
+        putln (introduce_self (self.name, self.age))
         
-    fun _kill (self)
-        putln ('Killing student ' + self.name)
 
-s = Student ('StudentName', 99)
+s = Student ('Shrehan', 19)
 s.introduce ()
 putln (s.name)
 putln (s.age)

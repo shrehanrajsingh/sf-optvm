@@ -117,6 +117,8 @@ sf_ast_gen (TokenSM *smt)
                 token_t *smt_back = smtv;
                 token_t *smt_front = smtv;
 
+                int is_empty = smt_front->type == TOK_NEWLINE;
+
                 int gb = 0;
                 token_t t;
 
@@ -153,33 +155,36 @@ sf_ast_gen (TokenSM *smt)
               l2:;
                 gb = 0;
 
-                while (smt_front->type != TOK_EOF)
+                if (!is_empty)
                   {
-                    t = *smt_front++;
-
-                    switch (t.type)
+                    while (smt_front->type != TOK_EOF)
                       {
-                      case TOK_OPERATOR:
-                        {
-                          const char *op = t.v.t_operator.value;
+                        t = *smt_front++;
 
-                          if (strstr ("({[", op) != NULL)
-                            gb++;
+                        switch (t.type)
+                          {
+                          case TOK_OPERATOR:
+                            {
+                              const char *op = t.v.t_operator.value;
 
-                          if (strstr (")}]", op) != NULL)
-                            gb--;
-                        }
-                        break;
+                              if (strstr ("({[", op) != NULL)
+                                gb++;
 
-                      case TOK_NEWLINE:
-                        {
-                          if (!gb)
-                            goto l0;
-                        }
-                        break;
+                              if (strstr (")}]", op) != NULL)
+                                gb--;
+                            }
+                            break;
 
-                      default:
-                        break;
+                          case TOK_NEWLINE:
+                            {
+                              if (!gb)
+                                goto l0;
+                            }
+                            break;
+
+                          default:
+                            break;
+                          }
                       }
                   }
 
@@ -194,10 +199,24 @@ sf_ast_gen (TokenSM *smt)
                 // here;
 
                 st.v.s_vardecl.name = sf_expr_gen (smt_back, smtv - 1);
-                st.v.s_vardecl.val = sf_expr_gen (smtv, smt_front - 1);
+
+                if (is_empty)
+                  {
+                    st.v.s_vardecl.val
+                        = SFMALLOC (sizeof (*st.v.s_vardecl.val));
+                    *st.v.s_vardecl.val
+                        = (expr_t){ .type = EXPR_CONST,
+                                    .v.e_const.v = { .type = CONST_NONE } };
+
+                    smtv = smt_front;
+                  }
+                else
+                  {
+                    st.v.s_vardecl.val = sf_expr_gen (smtv, smt_front - 1);
+                    smtv = smt_front - 1;
+                  }
 
                 res->vals[res->vl++] = st;
-                smtv = smt_front - 1;
               }
 
             else if (*op == '(')
@@ -292,7 +311,7 @@ sf_ast_gen (TokenSM *smt)
                                       args, (argc + 1) * sizeof (*args));
                                 }
 
-                              D (sf_token_print (*left));
+                              // D (sf_token_print (*left));
 
                               args[argc++] = sf_expr_gen (left, smt_front - 1);
                               left = smt_front;

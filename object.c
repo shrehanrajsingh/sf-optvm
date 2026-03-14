@@ -656,6 +656,7 @@ sf_obj_leq (obj_t *o, obj_t *p)
       else
         v2 = p->v.o_const.v.v.c_float.v;
 
+      // D (printf ("%f %f\n", v1, v2));
       return v1 <= v2;
     }
 

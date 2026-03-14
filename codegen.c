@@ -656,7 +656,12 @@ sf_vm_gen_bytecode (vm_t *vm, StmtSM *smt)
             stmt_t *body = s->v.s_fundecl.body;
             const char *name = s->v.s_fundecl.name;
 
-            vval_t *nl = add_var (vm, name);
+            vval_t *nl = NULL;
+
+            if (vm->meta.slot == SF_VM_SLOT_NAME)
+              ;
+            else
+              nl = add_var (vm, name);
 
             PRESERVE (vm);
 
@@ -725,6 +730,9 @@ sf_vm_gen_bytecode (vm_t *vm, StmtSM *smt)
             // sf_ht_free (ht);
 
             RESTORE (vm);
+
+            if (vm->meta.slot == SF_VM_SLOT_NAME)
+              nl = add_var (vm, name);
 
             if (nl->slot == SF_VM_SLOT_LOCAL)
               add_inst (vm, (instr_t){

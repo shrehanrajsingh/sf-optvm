@@ -78,7 +78,12 @@ makeop (char *op)
               op[2] = '\0';
           }
         else
-          op[1] = '\0';
+          {
+            if (op[1] == '=')
+              op[2] = '\0';
+            else
+              op[1] = '\0';
+          }
       }
       break;
 
@@ -115,6 +120,30 @@ sf_token_next (TokenSM *smt)
   int add_tok = 1;
 
   char d = *smt->raw++;
+
+  if (d == '#')
+    {
+      size_t j;
+      int saw_nl = 0;
+
+      for (j = 0; smt->raw[j] != '\0'; j++)
+        {
+          char e = smt->raw[j];
+
+          if (e == '\n')
+            {
+              saw_nl = 1;
+              break;
+            }
+        }
+
+      if (saw_nl)
+        smt->raw += j;
+      else
+        d = '\0';
+
+      // D (printf ("%s\n", smt->raw));
+    }
 
   if (d == '\0')
     {

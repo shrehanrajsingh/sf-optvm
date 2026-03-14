@@ -216,10 +216,10 @@ start:;
                 /* already pushed to stack */
               }
             else
-              push (vm, o = sf_objstore_req_forconst (&__sf_none_obj));
-
-            if (o != NULL)
-              IR (o);
+              {
+                push (vm, o = sf_objstore_req_forconst (&__sf_none_obj));
+                IR (o);
+              }
 
             goto end;
           }
@@ -274,6 +274,7 @@ start:;
                 DR (vm->globals[i.a], vm);
               }
             vm->globals[i.a] = val;
+            /* already IR'ed */
 
             // push (vm, val);
           }
@@ -1213,9 +1214,10 @@ start:;
             // IR (l);
             // IR (r);
 
-            if (r->type == l->type && l->type == OBJ_CONST
-                && l->v.o_const.v.type == r->v.o_const.v.type
-                && l->v.o_const.v.type == CONST_INT)
+            // if (r->type == l->type && l->type == OBJ_CONST
+            //     && l->v.o_const.v.type == r->v.o_const.v.type
+            //     && l->v.o_const.v.type == CONST_INT)
+            if (OBJ_IS_INT (l) && OBJ_IS_INT (r))
               {
                 int e = r->v.o_const.v.v.c_int.v + l->v.o_const.v.v.c_int.v;
 
@@ -1232,6 +1234,38 @@ start:;
 
                 push (vm, o);
                 IR (o);
+              }
+            else if (OBJ_IS_STRING (l))
+              {
+                if (OBJ_IS_STRING (r))
+                  {
+                    char *lstr = l->v.o_const.v.v.c_str.v;
+                    char *rstr = r->v.o_const.v.v.c_str.v;
+
+                    size_t ln = strlen (lstr);
+                    size_t rn = strlen (rstr);
+
+                    char *nstr = SFMALLOC ((ln + rn + 1) * sizeof (*nstr));
+
+                    strncpy (nstr, rstr, rn);
+                    strncpy (nstr + rn, lstr, ln);
+                    nstr[ln + rn] = '\0';
+
+                    obj_t *o = sf_objstore_req ();
+                    o->type = OBJ_CONST;
+                    o->v.o_const.v.type = CONST_STRING;
+                    o->v.o_const.v.v.c_str.v = nstr;
+
+                    push (vm, o);
+                    IR (o);
+                  }
+                else
+                  {
+                    D (printf (
+                        "string addition with type %d is not supported\n",
+                        r->type));
+                    exit (EXIT_FAILURE);
+                  }
               }
 
             DR (l, vm);
@@ -2183,12 +2217,26 @@ container_access (obj_t *o, char *name)
               return oj;
           }
         else
-          return r;
+          {
+            /**
+             * * Key not found
+             * * when key is not found,
+             * * return NULL because
+             * * NULL is used as an
+             * * indicator that
+             * * key is not present
+             */
+            if (r != NULL)
+              return r;
+          }
       }
       break;
 
     case OBJ_MOD:
       {
+        /* we can combine both function and class
+        under a unified container whose purpose is to
+        append module frame to the stack */
         mod_t *mo = o->v.o_mod.v;
 
         obj_t *r = NULL;
