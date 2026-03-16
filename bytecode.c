@@ -191,7 +191,7 @@ pop (vm_t *vm)
 SF_API void
 sf_vm_exec_single_frame (vm_t *vm)
 {
-  frame_t *fr = &vm->frames[vm->fp - 1];
+  frame_t *fr = vm->frames[vm->fp - 1];
   instr_t i = vm->insts[vm->ip];
 
   if (vm->meta.g_slot >= vm->globals_cap)
@@ -371,24 +371,42 @@ start:;
 
         case OP_LOAD_NAME:
           {
+            D (printf ("[OP_LOAD_NAME] c{'%s'} a{%d} b{%d}", i.c, i.a, i.b))
             obj_t *o = NULL;
 
             if (i.b == 0)
               o = fr->n.vals[i.a];
             else
               {
+                // D (sf_vm_print_inst (i));
                 int j = vm->fp - 1;
-                frame_t *ff = &vm->frames[j];
+                frame_t *ff = vm->frames[j];
 
                 while (j > -1 && ff->type != FRAME_NAME)
-                  ff = &vm->frames[--j];
+                  ff = vm->frames[--j];
 
+                D (printf ("%d", ff->is_class));
                 if (ff == NULL || j == -1)
                   {
                     printf ("name '%s' not found.", i.c);
                     exit (EXIT_FAILURE);
                   }
 
+                // if (ff->n.names[i.a] != NULL && strcmp (ff->n.names[i.a],
+                // i.c))
+                // {
+                //   for (size_t j = 0; j < ff->n.nvl; j++)
+                //     {
+                //       if (ff->n.names[j] != NULL)
+                //         printf ("(%s) (%s)\n", ff->n.names[j], i.c);
+                //       if (ff->n.names[j] != NULL
+                //           && !strcmp (ff->n.names[j], i.c))
+                //         o = ff->n.vals[j];
+                //     }
+                // }
+                // else
+                assert (ff->n.names[i.a] != NULL
+                        && !strcmp (ff->n.names[i.a], i.c));
                 o = ff->n.vals[i.a];
               }
 
@@ -421,7 +439,7 @@ start:;
                 /* number of levels to go up is less than number of frames */
                 assert (i.b < vm->fp);
 
-                push (vm, o = vm->frames[i.b].l.locals[i.a]);
+                push (vm, o = vm->frames[i.b]->l.locals[i.a]);
               }
 
             if (o != NULL)
@@ -437,6 +455,13 @@ start:;
             o->v.o_fun.v->v.coded.lp = i.a;
             o->v.o_fun.v->argc = o->v.o_fun.v->argl = i.b;
 
+            int fi = vm->fp - 1;
+            while (fi >= 0 && vm->frames[fi]->type == FRAME_LOCAL)
+              fi--;
+
+            assert (fi > -1);
+            o->v.o_fun.v->parent_frame = vm->frames[fi];
+
             IR (o);
             push (vm, o);
 
@@ -448,8 +473,11 @@ start:;
 
         case OP_CALL:
           {
+            // here;
             size_t argc = i.a;
             obj_t *name = pop (vm);
+
+            // sf_obj_print (*name);
             int saw_modwrap = 0;
             obj_t *ppres = NULL;
 
@@ -828,6 +856,8 @@ start:;
               case OBJ_MODHF:
                 {
                   sf_vm_addframe (vm, *name->v.o_modhf.v->v.o_mod.v->fr);
+                  // sf_vm_addframe (vm,
+                  //                 *name->v.o_modhf.f->v.o_fun.v->parent_frame);
 
                   fun_t *f = name->v.o_modhf.f->v.o_fun.v;
                   assert (f->argl == argc);
@@ -1415,7 +1445,9 @@ start:;
 
         case OP_LOAD_BUILDCLASS:
           {
+            D (printf ("[OP_LOAD_BUILDCLASS]"));
             frame_t nf = sf_frame_new_name ();
+            nf.is_class = 1;
 
             nf.return_ip = i.a; /* buildclass_end location */
             sf_vm_addframe (vm, nf);
@@ -1427,16 +1459,16 @@ start:;
 
         case OP_LOAD_BUILDCLASS_END:
           {
-            frame_t f = vm->frames[vm->fp - 1];
-            assert (f.type == FRAME_NAME);
+            frame_t f = *vm->frames[vm->fp - 1];
+            assert (f.type == FRAME_NAME && f.is_class);
 
             class_t *cl = sf_class_new ();
 
             cl->svl = f.n.nvl;
             cl->svc = f.n.nvl;
 
-            frame_t *ff = &vm->frames[vm->fp - 2];
-            if (ff->type == FRAME_NAME && ff->is_mod)
+            frame_t *ff = vm->frames[vm->fp - 2];
+            if (ff != NULL && ff->type == FRAME_NAME && ff->is_mod)
               {
                 cl->par_fr = ff;
               }
@@ -1472,7 +1504,8 @@ start:;
             push (vm, o);
             IR (o);
 
-            sf_vm_popframe (vm);
+            // sf_vm_popframe (vm);
+            vm->fp--;
 
             goto end2;
           }
@@ -1643,6 +1676,8 @@ start:;
             const char *path = i.c;
             const char *alias = vm->insts[++vm->ip].c;
 
+            D (printf ("[OP_IMPORT] path = '%s', alias = '%s'", path, alias));
+
             if (sf_modstore_haskey (vm->mod_store, vm->ip))
               {
                 obj_t *mg = sf_modstore_get (vm->mod_store, vm->ip);
@@ -1653,6 +1688,8 @@ start:;
               }
 
             FILE *f = fopen (path, "r");
+            // D (printf ("%s\n", path));
+
             if (f == NULL)
               {
                 perror ("error reading file");
@@ -1674,7 +1711,7 @@ start:;
             fclose (f);
 
             TokenSM *smt = sf_statem_token_new (buf);
-            //   printf ("%s\n", smt->raw);
+            // printf ("%s\n", smt->raw);
             sf_token_gen (smt);
             token_t *vp = smt->vals;
 
@@ -1797,7 +1834,37 @@ start:;
 
             PRESERVE (vm);
             vm->meta.slot = SF_VM_SLOT_NAME;
+
+            hashtable_t **hts = vm->hts;
+            size_t htsp = vm->htl;
+
+            vm->hts = SFMALLOC (vm->htc * sizeof (*vm->hts));
+            vm->htl = 0;
+
+            for (size_t i = 0; i < vm->htc; i++)
+              vm->hts[i] = NULL;
+
+            vm->hts[vm->htl++] = hts[0];
+            vm->hts[vm->htl++] = sf_ht_new ();
+
+            /**
+             * this adds bytecode to the end
+             * of current generated bytecode
+             * so control has
+             * [main program bytes]...[module bytes]
+             */
             sf_vm_gen_bytecode (vm, stt);
+
+            // sf_vm_print_b (vm);
+
+            for (size_t i = 1; i < vm->htc; i++)
+              if (vm->hts[i] != NULL)
+                sf_ht_free (vm->hts[i]);
+
+            SFFREE (vm->hts);
+
+            vm->hts = hts;
+            vm->htl = htsp;
 
             // for (size_t i = ip; i < vm->inst_len; i++)
             //   sf_vm_print_inst (vm->insts[i]);
@@ -1810,12 +1877,25 @@ start:;
             fr.return_ip = vm->ip;
             fr.stack_base = vm->sp;
 
+            // D (printf ("%d\n", ip));
             vm->ip = ip;
 
+            // frame_t *fpres = vm->frames;
+            // size_t fpc = vm->fp;
+
+            // vm->frames = SFMALLOC (vm->frame_cap * sizeof (*vm->frames));
+            // vm->fp = 0;
+
             sf_vm_addframe (vm, fr);
+            frame_t *bf = vm->frames[vm->fp - 1];
+
             sf_vm_exec_single_frame (vm);
 
-            frame_t *bf = &vm->frames[vm->fp - 1];
+            // D (printf ("%d\n", vm->ip));
+
+            // SFFREE (vm->frames);
+            // vm->frames = fpres;
+            // vm->fp = fpc;
 
             // // D (printf ("%lu\n", bf->n.nvl));
             // // for (int i = 0; i < bf->n.nvl; i++)
@@ -1850,7 +1930,14 @@ start:;
             IR (o);
             sf_modstore_add (vm->mod_store, vm->ip, o);
 
+            /**
+             * hide the frame and save it
+             * from deletion
+             */
             vm->fp--;
+
+            /* the frame (which will not be freed)
+              is allocated to mod */
             mod->fr = bf;
 
             // for (size_t i = 0; i < mod->fr->n.nvl; i++)
@@ -1912,7 +1999,7 @@ end2:;
 SF_API void
 sf_vm_exec_frame_top (vm_t *vm)
 {
-  frame_t *fr = &vm->frames[vm->fp - 1];
+  frame_t *fr = vm->frames[vm->fp - 1];
   instr_t i = vm->insts[vm->ip];
 
   if (vm->meta.g_slot >= vm->globals_cap)
@@ -1995,7 +2082,7 @@ end:;
   else if (vm->fp > 1)
     {
       sf_vm_popframe (vm);
-      fr = &vm->frames[vm->fp - 1];
+      fr = vm->frames[vm->fp - 1];
       goto start;
     }
 
@@ -2014,6 +2101,7 @@ sf_frame_new_local ()
   f.l.locals = SFMALLOC (f.l.locals_cap * sizeof (*f.l.locals));
   f.stack_base = 0;
   f.is_mod = 0;
+  f.is_class = 0;
 
   for (int i = 0; i < f.l.locals_cap; i++)
     f.l.locals[i] = NULL;
@@ -2033,6 +2121,7 @@ sf_frame_new_name ()
   f.n.names = SFMALLOC (f.n.nvc * sizeof (*f.n.names));
   f.stack_base = 0;
   f.is_mod = 0;
+  f.is_class = 0;
 
   for (int i = 0; i < f.n.nvc; i++)
     f.n.vals[i] = NULL;
@@ -2050,7 +2139,8 @@ sf_vm_addframe (vm_t *vm, frame_t f)
           = SFREALLOC (vm->frames, vm->frame_cap * sizeof (*vm->frames));
     }
 
-  vm->frames[vm->fp++] = f;
+  vm->frames[vm->fp] = SFMALLOC (sizeof (**vm->frames));
+  *vm->frames[vm->fp++] = f;
 }
 
 SF_API void
@@ -2062,8 +2152,9 @@ sf_vm_popframe (vm_t *vm)
   //   if (f->locals[i] != NULL)
   //     DR (f->locals[i], vm);
 
-  frame_t *fr = &vm->frames[vm->fp - 1];
+  frame_t *fr = vm->frames[vm->fp - 1];
   sf_vm_framefree (fr, vm);
+  SFFREE (vm->frames[vm->fp - 1]);
   --vm->fp;
 }
 

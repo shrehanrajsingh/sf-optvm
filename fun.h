@@ -21,6 +21,8 @@ enum NFType
   NF_ARG_ANY,
 };
 
+struct _frame_s;
+
 typedef struct
 {
   char *name;
@@ -29,6 +31,8 @@ typedef struct
   char **args;
   size_t argl;
   size_t argc;
+
+  struct _frame_s *parent_frame;
 
   union
   {

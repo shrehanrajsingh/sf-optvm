@@ -42,6 +42,7 @@ test3 ()
 
   StmtSM *stt = sf_ast_gen (smt);
 
+  stmt_t *stvls = stt->vals;
   here;
   D (printf ("stmt len: %lu\n", stt->vl));
   for (int i = 0; i < stt->vl; i++)
@@ -78,6 +79,9 @@ test3 ()
       c++;
     }
   while (0);
+
+  // sf_vm_print_b (&vm);
+
   // while (now_sec () < end);
   // printf ("%lu\n", c);
 

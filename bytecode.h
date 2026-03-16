@@ -91,6 +91,7 @@ typedef struct _frame_s
   size_t stack_base;
   int pop_ret_val; // 1: yes, 0: no
   int is_mod;
+  int is_class;
 
 } frame_t;
 
@@ -125,7 +126,7 @@ typedef struct _vm_s
   size_t stack_cap;
   size_t sp;
 
-  frame_t *frames;
+  frame_t **frames;
   size_t fp;
   size_t frame_cap;
 
