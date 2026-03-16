@@ -918,8 +918,8 @@ sf_vm_gen_bytecode (vm_t *vm, StmtSM *smt)
 
         case STMT_IMPORT:
           {
-            const char *alias = s->v.s_import.alias;
-            const char *path = s->v.s_import.path;
+            const char *alias = SFSTRDUP (s->v.s_import.alias);
+            const char *path = SFSTRDUP (s->v.s_import.path);
 
             add_inst (vm, (instr_t){
                               .op = OP_IMPORT,

@@ -447,6 +447,16 @@ sf_obj_print (obj_t o)
       printf ("<module '%s' at %p>", o.v.o_mod.v->name, o);
       break;
 
+    case OBJ_MODHF:
+      D (printf ("[modhf]"));
+      sf_obj_print (*o.v.o_modhf.f);
+      break;
+
+    case OBJ_MODHC:
+      D (printf ("[modhc]"));
+      sf_obj_print (*o.v.o_modhf.f);
+      break;
+
     default:
       printf ("<object:unknown %d>", o.type);
       break;

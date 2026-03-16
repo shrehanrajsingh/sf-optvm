@@ -9,7 +9,7 @@ sf_mod_new ()
   m->svl = 0;
   m->name = NULL;
   m->slots = NULL;
-  m->name = NULL;
+  m->vals = NULL;
 
   return m;
 }
