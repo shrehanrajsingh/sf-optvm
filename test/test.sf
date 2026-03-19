@@ -1,3 +1,4 @@
 import "../../test/mod2.sf" as m2
 
-m2.test ()
+a = m2.test ()
+putln (a)
