@@ -1,4 +1,4 @@
 a = 10
 
 fun test ()
-    putln (a)
+    putln (1 to a step 2)

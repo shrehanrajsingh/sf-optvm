@@ -44,6 +44,7 @@ typedef enum OpcodeType
   OP_RETURN = 26,
   OP_IMPORT = 27,
   OP_IMPORT_ALIAS = 28,
+  OP_RANGE = 29,
 
 } opcode_t;
 

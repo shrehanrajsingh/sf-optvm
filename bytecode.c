@@ -127,6 +127,9 @@ sf_vm_print_inst (instr_t i)
     case OP_RANGE_FAST:
       printf ("OP_RANGE_FAST: ");
       break;
+    case OP_RANGE:
+      printf ("OP_RANGE: ");
+      break;
     case OP_GET_ITER:
       printf ("OP_GET_ITER: ");
       break;
@@ -180,6 +183,7 @@ pop (vm_t *vm)
 {
   if (!vm->sp)
     {
+      D (sf_vm_print_inst (vm->insts[vm->ip]));
       D (printf ("vm_ip: %lu\n", vm->ip));
       D (printf ("error: popping from empty stack\n"));
       exit (1);
@@ -1607,6 +1611,83 @@ start:;
                 push (vm, o);
                 IR (o);
               }
+          }
+          break;
+
+        case OP_RANGE:
+          {
+            obj_t *lv = NULL;
+            obj_t *rv = NULL;
+            obj_t *stp = NULL;
+
+            if (i.a)
+              {
+                stp = pop (vm);
+              }
+
+            rv = pop (vm);
+            lv = pop (vm);
+
+            // D (sf_obj_print (*rv));
+            // D (sf_obj_print (*lv));
+
+            if (OBJ_IS_INT (lv) && OBJ_IS_INT (rv))
+              {
+                if (stp != NULL && !OBJ_IS_INT (stp))
+                  {
+                    printf ("expected step to be an integer\n");
+                    exit (EXIT_FAILURE);
+                  }
+
+                int lvi = lv->v.o_const.v.v.c_int.v;
+                int rvi = rv->v.o_const.v.v.c_int.v;
+                int stpi = stp != NULL ? stp->v.o_const.v.v.c_int.v : 1;
+
+                if (lvi < rvi)
+                  {
+                    array_t *a
+                        = sf_array_withsize (((rvi - 1 - lvi) / stpi) + 1);
+
+                    int c = 0;
+                    for (int j = lvi; j < rvi; j += stpi)
+                      {
+                        obj_t *o = sf_objstore_req_forconst (
+                            (const_t *)(const_t[]){ {
+                                .type = CONST_INT,
+                                .v.c_int.v = j,
+                            } });
+
+                        if (o == NULL)
+                          {
+                            o = sf_objstore_req ();
+                            o->type = OBJ_CONST;
+                            o->v.o_const.v.type = CONST_INT;
+                            o->v.o_const.v.v.c_int.v = j;
+                          }
+
+                        a->vals[c++] = o;
+                        IR (o);
+                      }
+
+                    if (a->len != c)
+                      a->len = c;
+
+                    obj_t *o = sf_objstore_req ();
+                    o->type = OBJ_ARRAY;
+                    o->v.o_array.v = a;
+
+                    push (vm, o);
+                    IR (o);
+                  }
+              }
+
+            if (i.a)
+              {
+                DR (stp, vm);
+              }
+
+            DR (rv, vm);
+            DR (lv, vm);
           }
           break;
 

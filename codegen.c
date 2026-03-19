@@ -432,6 +432,24 @@ sf_vm_gen_b_fromexpr (vm_t *vm, expr_t e)
                                 });
               }
           }
+        else
+          {
+            sf_vm_gen_b_fromexpr (vm, *lval);
+            sf_vm_gen_b_fromexpr (vm, *rval);
+
+            if (step != NULL)
+              {
+                sf_vm_gen_b_fromexpr (vm, *step);
+              }
+
+            add_inst (
+                vm, (instr_t){
+                        .op = OP_RANGE,
+                        .a = (step != NULL), /* 1 -> has step, 0 -> step = 1 */
+                        .b = 0,
+                        .c = NULL,
+                    });
+          }
       }
       break;
 
