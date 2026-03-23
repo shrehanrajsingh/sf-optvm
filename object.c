@@ -457,6 +457,11 @@ sf_obj_print (obj_t o)
       sf_obj_print (*o.v.o_modhf.f);
       break;
 
+    case OBJ_MODWRAP:
+      D (printf ("[modwrap]"));
+      sf_obj_print (*o.v.o_mw.f);
+      break;
+
     default:
       printf ("<object:unknown %d>", o.type);
       break;

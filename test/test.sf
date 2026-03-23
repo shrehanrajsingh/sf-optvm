@@ -1,21 +1,5 @@
-class Test
-    a = 10
-    b = 20
-
-    fun _init (self)
-        putln (self.a)
-
-    fun fact (self, a)
-        if a == 1
-            return a
-        return a * self.fact (a - 1)
-
-t = Test ()
-putln (t.a)
-putln (t.fact (5))
-
 import '../../test/mod.sf' as m
 
-b = m.BST (5)
+b = m.BST (10)
 b.insert (4)
-putln (b)
+b.print ()

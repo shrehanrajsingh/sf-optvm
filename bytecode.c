@@ -2110,7 +2110,6 @@ _sf_call_fun (vm_t *vm, obj_t *name, obj_t **args, size_t argc)
           {
             _sf_call_fun (vm, _init_method, args, al);
             push (vm, o);
-            // IR (o);
 
             /* resolve r-values */
             IR (_init_method);

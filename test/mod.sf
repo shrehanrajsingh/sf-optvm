@@ -21,7 +21,7 @@ class BST
                 self.left = BST (v)
 
     fun print (self)
-        put (self.val)
+        putln (self.val)
         
         if self.left
             self.left.print ()
