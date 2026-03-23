@@ -1,5 +1,6 @@
-import '../../test/mod.sf' as m
+fun test (a)
+    putln (a)
 
-b = m.BST (10)
-b.insert (4)
-b.print ()
+test (1)
+test (2)
+putln (10)
