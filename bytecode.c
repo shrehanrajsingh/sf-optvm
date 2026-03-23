@@ -1933,13 +1933,14 @@ _sf_call_fun (vm_t *vm, obj_t *name, obj_t **args, size_t argc)
               for (size_t i = 0; i < argc; i++)
                 {
                   push (vm, args[i]);
-                  IR (args[i]);
+                  // IR (args[i]);
                 }
 
               size_t lp = f->v.coded.lp;
 
               frame_t cf = sf_frame_new_local ();
               cf.return_ip = vm->ip;
+              cf.stack_base = vm->sp;
               sf_vm_addframe (vm, cf);
 
               vm->ip = lp;
