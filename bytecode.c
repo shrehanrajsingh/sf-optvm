@@ -1896,7 +1896,7 @@ _sf_call_fun (vm_t *vm, obj_t *name, obj_t **args, size_t argc)
               {
                 sf_vm_addframe (vm, *f->parent_frame);
                 remove_pf = 1;
-                here;
+                // here;
               }
           }
 
@@ -1957,7 +1957,7 @@ _sf_call_fun (vm_t *vm, obj_t *name, obj_t **args, size_t argc)
 
           case FUN_CODED:
             {
-              here;
+              // here;
               for (size_t i = 0; i < argc; i++)
                 {
                   push (vm, args[i]);
@@ -2000,7 +2000,10 @@ _sf_call_fun (vm_t *vm, obj_t *name, obj_t **args, size_t argc)
         class_t *cl = name->v.o_class.v;
         obj_t *_init_method = container_access (name, "_init");
 
-        D (sf_obj_print (*_init_method));
+        if (_init_method != NULL)
+          {
+            D (sf_obj_print (*_init_method));
+          }
 
         obj_t *o = sf_objstore_req ();
         o->type = OBJ_COBJ;
@@ -2013,7 +2016,19 @@ _sf_call_fun (vm_t *vm, obj_t *name, obj_t **args, size_t argc)
 
         args[argc++] = o;
         IR (o);
-        _sf_call_fun (vm, _init_method, args, argc);
+
+        if (_init_method != NULL)
+          {
+            size_t init_sp = vm->sp;
+            IR (_init_method);
+            _sf_call_fun (vm, _init_method, args, argc);
+
+            while (vm->sp > init_sp)
+              {
+                obj_t *tmp = pop (vm);
+                DR (tmp, vm);
+              }
+          }
 
         push (vm, o);
         IR (o);
@@ -2022,7 +2037,7 @@ _sf_call_fun (vm_t *vm, obj_t *name, obj_t **args, size_t argc)
 
     case OBJ_HFF:
       {
-        here;
+        // here;
         obj_t *fobj = name->v.o_hff.f;
         size_t e_al = name->v.o_hff.al;
         obj_t **e_args = name->v.o_hff.args;

@@ -1,17 +1,24 @@
-class Test
-    a =
+class List
+    val =
+    next =
 
-    fun _init (self, b)
-        self.a = b
+    fun _init (self, v, n)
+        self.val = v
+        self.next = n
     
-    fun print (self)
-        putln (self.a)
+    fun add (self, v)
+        if self.next
+            self.next.add (v)
+        else
+            self.next = List (v)
 
-a = Test (10)
-putln (a)
-putln (a)
-putln (a)
-putln ("BYEEE 3")
+    fun print (self)
+        putln (self.val)
+
+        if self.next
+            self.next.print ()
+
+a = List (1, List (2, List (3, List (4, List (5, none)))))
+
 putln (a)
 a.print ()
-putln ("BYEEE")

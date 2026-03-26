@@ -90,7 +90,7 @@ sf_objstore_req ()
 
   obj_t *r = NULL;
 
-  D (printf ("%lu\n", osfil));
+  // D (printf ("%lu\n", osfil));
   if (!osfil)
     {
       obj_t **rr = &objstore[osl++];
