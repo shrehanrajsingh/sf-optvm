@@ -516,10 +516,16 @@ start:;
 
             _sf_call_fun (vm, name, args, al);
 
-            // for (size_t i = 0; i < al; i++)
-            //   {
-            //     DR (args[i], vm);
-            //   }
+            for (size_t j = 0; j < al; j++)
+              {
+                DR (args[j], vm);
+              }
+
+            if (saw_modwrap)
+              {
+                vm->fp--;
+                DR (ppres, vm);
+              }
           }
           break;
 
@@ -1933,15 +1939,16 @@ _sf_call_fun (vm_t *vm, obj_t *name, obj_t **args, size_t argc)
                   break;
                 }
 
-              if (r == NULL)
-                r = sf_objstore_req_forconst (&__sf_none_obj);
-
               if (inst.b == 0)
                 {
-                  DR (r, vm);
+                  if (r != NULL)
+                    DR (r, vm);
                 }
               else
                 {
+                  if (r == NULL)
+                    r = sf_objstore_req_forconst (&__sf_none_obj);
+
                   push (vm, r);
                   IR (r);
                 }
@@ -2027,6 +2034,11 @@ _sf_call_fun (vm_t *vm, obj_t *name, obj_t **args, size_t argc)
           }
 
         _sf_call_fun (vm, fobj, args, argc);
+
+        for (size_t i = 0; i < e_al; i++)
+          {
+            DR (e_args[i], vm);
+          }
       }
       break;
 
