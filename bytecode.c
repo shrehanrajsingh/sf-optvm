@@ -501,12 +501,18 @@ start:;
             obj_t *args[64];
             size_t al = 0;
 
+            assert (argc < 64 && "only 64 arguments allowed in a function");
+
             while (al < argc)
               {
-                args[al++] = pop (vm);
+                args[al] = pop (vm);
+                IR (args[al]);
+                al++;
                 // sf_obj_print (*args[al - 1]);
                 // IR (args[al++]);
               }
+
+            IR (name);
 
             _sf_call_fun (vm, name, args, al);
 
@@ -777,10 +783,10 @@ start:;
             cl->svc = f.n.nvl;
 
             frame_t *ff = vm->frames[vm->fp - 2];
-            if (ff != NULL && ff->type == FRAME_NAME && ff->is_mod)
-              {
-                cl->par_fr = ff;
-              }
+            // if (ff != NULL && ff->type == FRAME_NAME && ff->is_mod)
+            {
+              cl->par_fr = ff;
+            }
 
             // cl->slots = SFMALLOC (sizeof (*cl->slots));
             // cl->vals = SFMALLOC (sizeof (*cl->vals));
@@ -1538,15 +1544,17 @@ sf_vm_popframe (vm_t *vm)
   //   if (f->locals[i] != NULL)
   //     DR (f->locals[i], vm);
 
-  frame_t *fr = vm->frames[vm->fp - 1];
-  sf_vm_framefree (fr, vm);
-  SFFREE (vm->frames[vm->fp - 1]);
+  // frame_t *fr = vm->frames[vm->fp - 1];
+  // sf_vm_framefree (fr, vm);
+  // SFFREE (fr);
+  // vm->frames[vm->fp - 1] = NULL;
   --vm->fp;
 }
 
 SF_API void
 sf_vm_framefree (frame_t *f, vm_t *vm)
 {
+  return;
   // D (printf ("%p", f));
   // D (printf ("%lu\n", f->locals_count));
 
@@ -1554,7 +1562,7 @@ sf_vm_framefree (frame_t *f, vm_t *vm)
     {
     case FRAME_LOCAL:
       {
-        // here;
+        here;
         // if (f->l.locals != NULL)
         for (int i = 0; i < f->l.locals_cap; i++)
           {
@@ -1610,30 +1618,30 @@ container_access (obj_t *o, char *name)
       {
         class_t *c = o->v.o_class.v;
 
-        if (c->par_fr == NULL)
-          {
-            for (int i = 0; i < c->svl; i++)
-              if (!strcmp (c->slots[i], name))
-                return c->vals[i];
-          }
-        else
-          {
-            obj_t *r = NULL;
+        // if (c->par_fr == NULL)
+        {
+          for (int i = 0; i < c->svl; i++)
+            if (!strcmp (c->slots[i], name))
+              return c->vals[i];
+        }
+        // else
+        //   {
+        //     obj_t *r = NULL;
 
-            for (int i = 0; i < c->svl; i++)
-              {
-                if (!strcmp (c->slots[i], name))
-                  {
-                    r = c->vals[i];
-                    break;
-                  }
-              }
+        //     for (int i = 0; i < c->svl; i++)
+        //       {
+        //         if (!strcmp (c->slots[i], name))
+        //           {
+        //             r = c->vals[i];
+        //             break;
+        //           }
+        //       }
 
-            obj_t *j = sf_objstore_req ();
-            j->type = OBJ_MODWRAP;
-            j->v.o_mw.v = c->par_fr;
-            j->v.o_mw.f = r;
-          }
+        //     obj_t *j = sf_objstore_req ();
+        //     j->type = OBJ_MODWRAP;
+        //     j->v.o_mw.v = c->par_fr;
+        //     j->v.o_mw.f = r;
+        //   }
       }
       break;
 
@@ -1678,20 +1686,20 @@ container_access (obj_t *o, char *name)
             *oj->v.o_hff.args = o;
             IR (o);
 
-            class_t *cp = c->p;
+            // class_t *cp = c->p;
 
-            if (cp->par_fr != NULL)
-              {
-                obj_t *oo = sf_objstore_req ();
-                oo->type = OBJ_MODWRAP;
-                oo->v.o_mw.v = cp->par_fr;
-                oo->v.o_mw.f = oj;
+            // if (cp->par_fr != NULL)
+            //   {
+            //     obj_t *oo = sf_objstore_req ();
+            //     oo->type = OBJ_MODWRAP;
+            //     oo->v.o_mw.v = cp->par_fr;
+            //     oo->v.o_mw.f = oj;
 
-                IR (oj);
-                return oo;
-              }
-            else
-              return oj;
+            //     IR (oj);
+            //     return oo;
+            //   }
+            // else
+            return oj;
           }
         else
           {
@@ -1863,16 +1871,27 @@ sqr_set (obj_t *p, obj_t *i, obj_t *val, vm_t *vm)
 void
 _sf_call_fun (vm_t *vm, obj_t *name, obj_t **args, size_t argc)
 {
+  instr_t inst = vm->insts[vm->ip];
+
   switch (name->type)
     {
     case OBJ_FUNC:
       {
         fun_t *f = name->v.o_fun.v;
+        int remove_pf = 0;
 
-        if (f->type != FUN_NATIVE)
+        if (f->type == FUN_CODED)
           {
-            assert (f->parent_frame != NULL);
-            sf_vm_addframe (vm, *f->parent_frame);
+            int fi = vm->fp - 1;
+            while (fi > -1 && vm->frames[fi] != f->parent_frame)
+              --fi;
+
+            if (fi == -1)
+              {
+                sf_vm_addframe (vm, *f->parent_frame);
+                remove_pf = 1;
+                here;
+              }
           }
 
         switch (f->type)
@@ -1883,14 +1902,201 @@ _sf_call_fun (vm_t *vm, obj_t *name, obj_t **args, size_t argc)
               int nf_type = f->v.native.nf_type;
               int scc = f->v.native.scc;
 
+              obj_t *r = NULL;
               switch (nf_type)
+                {
+                case NF_ARG_1:
+                  {
+                    r = f->v.native.v.f_onearg (args[0]);
+                  }
+                  break;
+
+                case NF_ARG_2:
+                  {
+                    r = f->v.native.v.f_twoarg (args[0], args[1]);
+                  }
+                  break;
+
+                case NF_ARG_3:
+                  {
+                    r = f->v.native.v.f_threearg (args[0], args[1], args[2]);
+                  }
+                  break;
+
+                case NF_ARG_ANY:
+                  {
+                    r = f->v.native.v.f_anyarg (args, argc);
+                  }
+                  break;
+
+                default:
+                  break;
+                }
+
+              if (r == NULL)
+                r = sf_objstore_req_forconst (&__sf_none_obj);
+
+              if (inst.b == 0)
+                {
+                  DR (r, vm);
+                }
+              else
+                {
+                  push (vm, r);
+                  IR (r);
+                }
+            }
+            break;
+
+          case FUN_CODED:
+            {
+              here;
+              for (size_t i = 0; i < argc; i++)
+                {
+                  push (vm, args[i]);
+                  IR (args[i]);
+                }
+
+              size_t lp = f->v.coded.lp;
+
+              frame_t cf = sf_frame_new_local ();
+              cf.return_ip = vm->ip;
+              cf.stack_base = vm->sp;
+              vm->ip = lp;
+
+              if (inst.b == 0)
+                cf.pop_ret_val = 1;
+              else if (inst.b == 1)
+                cf.pop_ret_val = 0;
+
+              sf_vm_addframe (vm, cf);
+              sf_vm_exec_single_frame (vm);
+              sf_vm_popframe (vm);
+              // vm->fp--;
+            }
+            break;
+
+          default:
+            break;
+          }
+
+        if (remove_pf)
+          {
+            /* soft remove */
+            --vm->fp;
+          }
+      }
+      break;
+
+    case OBJ_CLASS:
+      {
+        class_t *cl = name->v.o_class.v;
+        obj_t *_init_method = container_access (name, "_init");
+
+        D (sf_obj_print (*_init_method));
+
+        obj_t *o = sf_objstore_req ();
+        o->type = OBJ_COBJ;
+
+        cobj_t *cobj = sf_cobj_new (cl);
+        o->v.o_cobj.v = cobj;
+
+        // push (vm, o);
+        // IR (o);
+
+        args[argc++] = o;
+        IR (o);
+        _sf_call_fun (vm, _init_method, args, argc);
+
+        push (vm, o);
+        IR (o);
+      }
+      break;
+
+    case OBJ_HFF:
+      {
+        here;
+        obj_t *fobj = name->v.o_hff.f;
+        size_t e_al = name->v.o_hff.al;
+        obj_t **e_args = name->v.o_hff.args;
+
+        for (size_t i = 0; i < e_al; i++)
+          {
+            args[argc++] = e_args[i];
+            IR (e_args[i]);
+          }
+
+        _sf_call_fun (vm, fobj, args, argc);
+      }
+      break;
+
+    default:
+      {
+        D (sf_obj_print (*name));
+        D (printf ("Unsupported callable"));
+      }
+      break;
+    }
+
+  DR (name, vm);
+}
+
+/*
+void
+_sf_call_fun (vm_t *vm, obj_t *name, obj_t **args, size_t argc)
+{
+  int saw_modwrap = 0;
+  obj_t *ppres = NULL;
+
+  if (name->type == OBJ_MODWRAP)
+    {
+      saw_modwrap = 1;
+      sf_vm_addframe (vm, *name->v.o_mw.v);
+      ppres = name;
+      name = name->v.o_mw.f;
+    }
+
+  instr_t i = vm->insts[vm->ip];
+  size_t al = argc;
+
+  switch (name->type)
+    {
+    case OBJ_FUNC:
+      {
+        fun_t *f = name->v.o_fun.v;
+        assert (f->argl == argc);
+
+        switch (f->type)
+          {
+          case FUN_NATIVE:
+            {
+              switch (f->v.native.nf_type)
                 {
                 case NF_ARG_1:
                   {
                     obj_t *r = f->v.native.v.f_onearg (args[0]);
 
                     if (r != NULL)
-                      DR (r, vm);
+                      {
+                        if (i.b != 1)
+                          {
+                            DR (r, vm);
+                          }
+                        else
+                          {
+                            push (vm, r);
+                          }
+                      }
+                    else
+                      {
+                        if (i.b == 1)
+                          {
+                            obj_t *o
+                                = sf_objstore_req_forconst (&__sf_none_obj);
+
+                            push (vm, o);
+                          }
+                      }
                   }
                   break;
 
@@ -1899,7 +2105,24 @@ _sf_call_fun (vm_t *vm, obj_t *name, obj_t **args, size_t argc)
                     obj_t *r = f->v.native.v.f_twoarg (args[0], args[1]);
 
                     if (r != NULL)
-                      DR (r, vm);
+                      {
+                        if (i.b != 1)
+                          {
+                            DR (r, vm);
+                          }
+                        else
+                          {
+                            push (vm, r);
+                          }
+                      }
+                    else
+                      {
+                        if (i.b == 1)
+                          {
+                            obj_t *o
+                                = sf_objstore_req_forconst (&__sf_none_obj);
+                          }
+                      }
                   }
                   break;
 
@@ -1909,44 +2132,88 @@ _sf_call_fun (vm_t *vm, obj_t *name, obj_t **args, size_t argc)
                         = f->v.native.v.f_threearg (args[0], args[1], args[2]);
 
                     if (r != NULL)
-                      DR (r, vm);
+                      {
+                        if (i.b != 1)
+                          {
+                            DR (r, vm);
+                          }
+                        else
+                          {
+                            push (vm, r);
+                          }
+                      }
+                    else
+                      {
+                        if (i.b == 1)
+                          {
+                            obj_t *o
+                                = sf_objstore_req_forconst (&__sf_none_obj);
+                          }
+                      }
                   }
                   break;
 
                 case NF_ARG_ANY:
                   {
-                    obj_t *r = f->v.native.v.f_anyarg (args, argc);
+                    obj_t *r = f->v.native.v.f_anyarg (args, al);
 
                     if (r != NULL)
-                      DR (r, vm);
+                      {
+                        if (i.b != 1)
+                          {
+                            DR (r, vm);
+                          }
+                        else
+                          {
+                            push (vm, r);
+                          }
+                      }
+                    else
+                      {
+                        if (i.b == 1)
+                          {
+                            obj_t *o
+                                = sf_objstore_req_forconst (&__sf_none_obj);
+                          }
+                      }
                   }
                   break;
 
                 default:
                   break;
                 }
+
+              for (size_t i = 0; i < al; i++)
+                DR (args[i], vm);
             }
             break;
 
           case FUN_CODED:
             {
-              for (size_t i = 0; i < argc; i++)
+              size_t lp = f->v.coded.lp;
+
+              for (size_t i = 0; i < al; i++)
                 {
                   push (vm, args[i]);
                   // IR (args[i]);
                 }
 
-              size_t lp = f->v.coded.lp;
+              frame_t frt = sf_frame_new_local ();
+              frt.return_ip = vm->ip;
+              // D (printf ("%d\n", fr.return_ip));
+              frt.stack_base = vm->sp;
 
-              frame_t cf = sf_frame_new_local ();
-              cf.return_ip = vm->ip;
-              cf.stack_base = vm->sp;
-              sf_vm_addframe (vm, cf);
-
+              // fr = &vm->frames[vm->fp - 1];
               vm->ip = lp;
+
+              if (i.b == 1)
+                frt.pop_ret_val = 0;
+              else
+                frt.pop_ret_val = 1;
+
+              sf_vm_addframe (vm, frt);
               sf_vm_exec_single_frame (vm);
-              // sf_vm_popframe (vm);
-              vm->fp--;
+              sf_vm_popframe (vm);
             }
             break;
 
@@ -1956,7 +2223,124 @@ _sf_call_fun (vm_t *vm, obj_t *name, obj_t **args, size_t argc)
       }
       break;
 
+    case OBJ_HFF:
+      {
+        size_t hf_al = name->v.o_hff.al;
+        obj_t **hf_args = name->v.o_hff.args;
+        obj_t *hf_fo = name->v.o_hff.f;
+
+        assert (hf_fo->type == OBJ_FUNC);
+        fun_t *f = hf_fo->v.o_fun.v;
+
+        // for (int j = al - 1; j > -1; j--)
+        //   {
+        //     args[j + hf_al] = args[j];
+        //   }
+
+        // for (size_t j = 0; j < hf_al; j++)
+        //   {
+        //     args[j] = hf_args[j];
+        //   }
+
+        for (size_t j = 0; j < hf_al; j++)
+          {
+            args[al++] = hf_args[j];
+            IR (hf_args[j]);
+          }
+
+        // al += hf_al;
+        // assert (al == f->argl);
+        _sf_call_fun (vm, hf_fo, args, al);
+      }
+      break;
+
+    case OBJ_MODHF:
+      {
+        sf_vm_addframe (vm, *name->v.o_modhf.v->v.o_mod.v->fr);
+        // sf_vm_addframe (vm,
+        //                 *name->v.o_modhf.f->v.o_fun.v->parent_frame);
+
+        fun_t *f = name->v.o_modhf.f->v.o_fun.v;
+        // assert (f->argl == argc);
+
+        _sf_call_fun (vm, name->v.o_modhf.f, args, al);
+
+        vm->fp--;
+      }
+      break;
+
+    case OBJ_MODHC:
+      {
+        sf_vm_addframe (vm, *name->v.o_modcf.v->v.o_mod.v->fr);
+
+        class_t *c = name->v.o_modcf.f->v.o_class.v;
+        cobj_t *co = sf_cobj_new (c);
+
+        obj_t *o = sf_objstore_req ();
+        o->type = OBJ_COBJ;
+        o->v.o_cobj.v = co;
+
+        if (i.b == 1)
+          {
+            push (vm, o);
+            IR (o);
+          }
+        // else
+        //   sf_cobj_free (co);
+
+        obj_t *_init_method = container_access (o, "_init");
+        if (_init_method != NULL)
+          {
+            _sf_call_fun (vm, _init_method, args, al);
+            push (vm, o);
+
+            IR (_init_method);
+            DR (_init_method, vm);
+          }
+
+        vm->fp--;
+      }
+      break;
+
+    case OBJ_CLASS:
+      {
+        class_t *c = name->v.o_class.v;
+        cobj_t *co = sf_cobj_new (c);
+
+        obj_t *o = sf_objstore_req ();
+        o->type = OBJ_COBJ;
+        o->v.o_cobj.v = co;
+
+        if (i.b == 1)
+          {
+            push (vm, o);
+            IR (o);
+          }
+        // else
+        //   sf_cobj_free (co);
+
+        obj_t *_init_method = container_access (o, "_init");
+        if (_init_method != NULL)
+          {
+            _sf_call_fun (vm, _init_method, args, al);
+            push (vm, o);
+            // IR (o);
+            IR (_init_method);
+            DR (_init_method, vm);
+          }
+      }
+      break;
+
     default:
       break;
     }
+
+  if (saw_modwrap)
+    {
+      name = ppres;
+      vm->fp--;
+    }
+
+  DR (name, vm);
 }
+*/

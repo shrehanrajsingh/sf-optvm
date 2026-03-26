@@ -1,6 +1,15 @@
-fun test (a)
-    putln (a)
+class Test
+    a =
 
-test (1)
-test (2)
-putln (10)
+    fun _init (self, b)
+        self.a = b
+    
+    fun print (self)
+        putln (self.a)
+
+a = Test (10)
+putln (a)
+putln (a)
+putln (a)
+putln (a)
+a.print ()
