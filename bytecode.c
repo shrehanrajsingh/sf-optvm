@@ -317,7 +317,7 @@ start:;
           {
             obj_t *val = pop (vm);
 
-            if (i.b == 0)
+            if (i.b == 0) /* normal store */
               {
                 if (i.a >= fr->n.nvc)
                   {
@@ -1627,7 +1627,7 @@ container_access (obj_t *o, char *name)
         // if (c->par_fr == NULL)
         {
           for (int i = 0; i < c->svl; i++)
-            if (!strcmp (c->slots[i], name))
+            if (c->slots[i] != NULL && !strcmp (c->slots[i], name))
               return c->vals[i];
         }
         // else
@@ -1734,7 +1734,7 @@ container_access (obj_t *o, char *name)
         for (size_t i = 0; i < mo->svl; i++)
           {
             // D (printf ("(%s)\n", mo->slots[i]));
-            if (!strcmp (mo->slots[i], name))
+            if (mo->slots[i] != NULL && !strcmp (mo->slots[i], name))
               {
                 r = mo->vals[i];
                 break;

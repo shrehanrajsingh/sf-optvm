@@ -20,5 +20,6 @@ class List
 
 a = List (1, List (2, List (3, List (4, List (5, none)))))
 
-putln (a)
-a.print ()
+while 1
+    putln (a)
+    a.print ()
