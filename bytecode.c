@@ -445,7 +445,7 @@ start:;
                 /* number of levels to go up is less than number of frames */
                 assert (i.b < vm->fp);
 
-                push (vm, o = vm->frames[i.b]->l.locals[i.a]);
+                push (vm, o = vm->frames[vm->fp - 1 - i.b]->l.locals[i.a]);
               }
 
             if (o != NULL)
@@ -501,7 +501,12 @@ start:;
             obj_t *args[64];
             size_t al = 0;
 
-            assert (argc < 64 && "only 64 arguments allowed in a function");
+            // assert (argc < 64 && "only 64 arguments allowed in a function");
+            if (argc >= 64)
+              {
+                printf ("only 64 arguments allowed in a function.\n");
+                exit (EXIT_FAILURE);
+              }
 
             while (al < argc)
               {
@@ -892,6 +897,12 @@ start:;
             int lv = i.a;
             int rv = i.b;
             int step = (int)i.c;
+
+            if (step == 0)
+              {
+                printf ("range step cannot be zero\n");
+                exit (EXIT_FAILURE);
+              }
 
             if (lv < rv)
               {
@@ -1838,7 +1849,12 @@ sqr_access (obj_t *p, obj_t *v)
 
         array_t *a = p->v.o_array.v;
 
-        assert (a->len > idx);
+        if (idx < 0 || (size_t)idx >= a->len)
+          {
+            printf ("array index out of range\n");
+            exit (EXIT_FAILURE);
+          }
+
         r = a->vals[idx];
       }
       break;
@@ -1862,7 +1878,11 @@ sqr_set (obj_t *p, obj_t *i, obj_t *val, vm_t *vm)
         int idx = i->v.o_const.v.v.c_int.v;
         array_t *a = p->v.o_array.v;
 
-        assert (a->len > idx);
+        if (idx < 0 || (size_t)idx >= a->len)
+          {
+            printf ("array index out of range\n");
+            exit (EXIT_FAILURE);
+          }
 
         DR (a->vals[idx], vm);
         a->vals[idx] = val;
@@ -1884,6 +1904,12 @@ _sf_call_fun (vm_t *vm, obj_t *name, obj_t **args, size_t argc)
     case OBJ_FUNC:
       {
         fun_t *f = name->v.o_fun.v;
+        if (argc >= 64)
+          {
+            printf ("only 64 arguments allowed in a function\n");
+            exit (EXIT_FAILURE);
+          }
+
         int remove_pf = 0;
 
         if (f->type == FUN_CODED)
@@ -2044,6 +2070,12 @@ _sf_call_fun (vm_t *vm, obj_t *name, obj_t **args, size_t argc)
 
         for (size_t i = 0; i < e_al; i++)
           {
+            if (argc >= 64)
+              {
+                printf ("only 64 arguments allowed in a function\n");
+                exit (EXIT_FAILURE);
+              }
+
             args[argc++] = e_args[i];
             IR (e_args[i]);
           }

@@ -1034,10 +1034,15 @@ sf_expr_gen (token_t *start, token_t *end)
 
                 arith_node_t *nodes = SFMALLOC (nc * sizeof (*nodes));
 
-                expr_t *em = SFMALLOC (sizeof (*em));
-                *em = e;
-                nodes[nl++]
-                    = (arith_node_t){ .type = ARITH_NODE_E_O, .v.expr = em };
+                expr_t *em = NULL;
+
+                if (e.type != -1)
+                  {
+                    em = SFMALLOC (sizeof (*em));
+                    *em = e;
+                    nodes[nl++] = (arith_node_t){ .type = ARITH_NODE_E_O,
+                                                  .v.expr = em };
+                  }
 
                 nodes[nl++] = (arith_node_t){ .type = ARITH_NODE_OPERATOR,
                                               .v.op = (char *)op };
@@ -1050,7 +1055,6 @@ sf_expr_gen (token_t *start, token_t *end)
 
                 while (start <= end)
                   {
-                    // sf_token_print (t);
                     if (t.type == TOK_OPERATOR)
                       {
                         const char *op = t.v.t_operator.value;
@@ -1076,7 +1080,8 @@ sf_expr_gen (token_t *start, token_t *end)
                                                   .v.expr
                                                   = sf_expr_gen (l1, start) };
 
-                            if (nodes[nl - 1].v.expr->type != EXPR_CONST)
+                            if (nl > 0
+                                && nodes[nl - 1].v.expr->type != EXPR_CONST)
                               all_consts = 0;
 
                             l1 = start + 1;
@@ -1086,6 +1091,9 @@ sf_expr_gen (token_t *start, token_t *end)
                                                   .v.op = (char *)op };
                           }
                       }
+
+                    if (gb < 0)
+                      break;
 
                     t = *++start;
                   }
@@ -1105,8 +1113,9 @@ sf_expr_gen (token_t *start, token_t *end)
                 if (nodes[nl - 1].v.expr->type != EXPR_CONST)
                   all_consts = 0;
 
-                // for (int i = 0; i < nl; i++)
-                //   sf_arithnode_print (nodes[i]);
+                D (printf ("%d\n", nl));
+                for (int i = 0; i < nl; i++)
+                  D (sf_arithnode_print (nodes[i]));
 
                 /* add 1 */
                 if (!all_consts && nl == 3
@@ -1134,6 +1143,31 @@ sf_expr_gen (token_t *start, token_t *end)
                     e.v.e_add_one.v = nodes[2].v.expr;
 
                     SFFREE (nodes);
+                  }
+                /* +c or -c */
+                else if (nl == 2 && nodes[0].type == ARITH_NODE_OPERATOR
+                         && (!strcmp (nodes[0].v.op, "-")
+                             || !strcmp (nodes[0].v.op, "+")))
+                  {
+                    nodes[2] = nodes[1];
+                    nodes[1] = nodes[0];
+
+                    expr_t *e_zr = SFMALLOC (sizeof (*e_zr));
+                    *e_zr = (expr_t){
+                      .type = EXPR_CONST,
+                      .v.e_const.v.type = CONST_INT,
+                      .v.e_const.v.v.c_int.v = 0,
+                    };
+
+                    nodes[0] = (arith_node_t){ .type = ARITH_NODE_E_O,
+                                               .v.expr = e_zr };
+                    nl++;
+
+                    sf_arith_makepostfix (&nodes, nl);
+
+                    e.type = EXPR_ARITHMETIC;
+                    e.v.e_arith.tl = nl;
+                    e.v.e_arith.tree = nodes;
                   }
                 else
                   {
@@ -1164,6 +1198,10 @@ sf_expr_gen (token_t *start, token_t *end)
                         // sf_arith_print_tree (nodes, nl);
                       }
                   }
+
+                // D (printf ("%d\n", nl));
+                // for (int i = 0; i < nl; i++)
+                //   D (sf_arithnode_print (nodes[i]));
 
                 start = end;
                 goto end;

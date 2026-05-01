@@ -1,25 +1,4 @@
-class List
-    val =
-    next =
+a = [1, 2, 3]
+b = a[2]
 
-    fun _init (self, v, n)
-        self.val = v
-        self.next = n
-    
-    fun add (self, v)
-        if self.next
-            self.next.add (v)
-        else
-            self.next = List (v)
-
-    fun print (self)
-        putln (self.val)
-
-        if self.next
-            self.next.print ()
-
-a = List (1, List (2, List (3, List (4, List (5, none)))))
-
-while 1
-    putln (a)
-    a.print ()
+putln (b)
