@@ -1,5 +1,4 @@
-import '../../test/mod.sf' as m
+a = [1, 2, 3]
+b = a[2]
 
-b = m.BST (10)
-b.insert (4)
-b.print ()
+putln (b)

@@ -9,6 +9,7 @@
 #include "ht.h"
 #include "iter.h"
 #include "object.h"
+#include "progdata.h"
 #include "stmt.h"
 
 typedef enum OpcodeType
@@ -140,6 +141,8 @@ typedef struct _vm_s
     size_t l_slot; /* local slot count */
     size_t n_slot; /* name slot count */
   } meta;
+
+  progdata_t pg;
 
 } vm_t;
 
