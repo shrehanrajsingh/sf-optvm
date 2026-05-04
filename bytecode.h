@@ -10,6 +10,7 @@
 #include "iter.h"
 #include "object.h"
 #include "progdata.h"
+#include "std.h"
 #include "stmt.h"
 
 typedef enum OpcodeType
@@ -150,7 +151,16 @@ typedef struct _vm_s
 
   } meta;
 
-  progdata_t *pg;
+  struct
+  {
+    int continue_exec;
+    int errn;
+
+  } signals;
+
+  progdata_t *pg; /* program data */
+  std_t *std;     /* stack trace data */
+  char err[128];  /* err message */
 
 } vm_t;
 
@@ -184,6 +194,7 @@ extern "C"
   SF_API void container_set (obj_t *, char *, obj_t *, vm_t *);
   SF_API obj_t *sqr_access (obj_t *, obj_t *);
   SF_API void sqr_set (obj_t *, obj_t *, obj_t *, vm_t *);
+  SF_API void sf_vm_seterr (vm_t *, const char *, ...);
 
 #if defined(__cplusplus)
 }

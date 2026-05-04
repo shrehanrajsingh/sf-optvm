@@ -13,6 +13,8 @@
 #include "mut.h"
 #include "natives.h"
 #include "object.h"
+#include "progdata.h"
+#include "std.h"
 #include "stmt.h"
 #include "token.h"
 

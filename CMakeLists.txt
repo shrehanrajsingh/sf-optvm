@@ -29,5 +29,6 @@ add_library(sunflower
     natives.h natives.c
     mod.h mod.c
     sunflower.h sunflower.c
-    progdata.h progdata.c)
+    progdata.h progdata.c
+    std.h std.c)
 

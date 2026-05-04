@@ -10,6 +10,14 @@ static const_t __sf_none_obj = (const_t){ .type = CONST_NONE };
 
 void _sf_call_fun (vm_t *_VM, obj_t *_Name, obj_t **_Args, size_t _ArgCount);
 
+#define STDWRAP_BEGIN                                                         \
+  {                                                                           \
+    sf_std_push (vm->std, i.meta.line, i.meta.offset);
+
+#define STDWRAP_END                                                           \
+  sf_std_pop (vm->std);                                                       \
+  }
+
 SF_API vm_t
 sf_vm_new ()
 {
@@ -46,6 +54,12 @@ sf_vm_new ()
 
   v.pg = SFMALLOC (sizeof (*v.pg));
   *v.pg = sf_progdata_new ();
+
+  v.std = SFMALLOC (sizeof (*v.std));
+  *v.std = sf_std_new ();
+
+  v.signals.continue_exec = 1;
+  v.signals.errn = 0;
 
   for (int i = 0; i < v.globals_cap; i++)
     v.globals[i] = NULL;
@@ -192,7 +206,7 @@ pop (vm_t *vm)
       D (sf_vm_print_inst (vm->insts[vm->ip]));
       D (printf ("vm_ip: %lu\n", vm->ip));
       D (printf ("error: popping from empty stack\n"));
-      exit (1);
+      exit (EXIT_FAILURE);
     }
 
   return vm->stack[--vm->sp];
@@ -212,8 +226,9 @@ sf_vm_exec_single_frame (vm_t *vm)
     }
 
 start:;
-  while (1)
+  while (vm->signals.continue_exec)
     {
+      STDWRAP_BEGIN
       // D (printf ("%lu\n", vm->ip));
       switch (i.op)
         {
@@ -231,6 +246,7 @@ start:;
                 IR (o);
               }
 
+            sf_std_pop (vm->std);
             goto end;
           }
           break;
@@ -837,6 +853,7 @@ start:;
             // sf_vm_popframe (vm);
             vm->fp--;
 
+            sf_std_pop (vm->std);
             goto end2;
           }
           break;
@@ -852,10 +869,11 @@ start:;
 
             if (o == NULL)
               {
-                printf ("member '%s' does not exist.\n", name);
-                printf ("line %d: %s\n", i.meta.line,
-                        vm->pg->lines[i.meta.line]);
-                exit (EXIT_FAILURE);
+                // printf ("member '%s' does not exist.\n", name);
+                sf_vm_seterr (vm, "member '%s' does not exist.\n", name);
+                // printf ("line %d: %s\n", i.meta.line,
+                //         vm->pg->lines[i.meta.line]);
+                goto end3;
               }
 
             push (vm, o);
@@ -1396,7 +1414,27 @@ start:;
         }
 
     end3:;
+      if (!vm->signals.continue_exec)
+        {
+          printf ("err: %s\n", vm->err);
+
+          printf ("stack trace: \n");
+          for (int j = vm->std->ll - 1; j >= 0; j--)
+            {
+              char *p = vm->pg->lines[vm->std->lis[j] + vm->std->lof[j]];
+
+              while (*p && isspace (*p))
+                p++;
+
+              printf ("%lu | %s\n", vm->std->lis[j] + vm->std->lof[j] + 1, p);
+            }
+
+          exit (EXIT_FAILURE);
+        }
+
       i = vm->insts[++vm->ip];
+
+      STDWRAP_END
     }
 
 end:;
@@ -2104,6 +2142,19 @@ _sf_call_fun (vm_t *vm, obj_t *name, obj_t **args, size_t argc)
     }
 
   DR (name, vm);
+}
+
+SF_API void
+sf_vm_seterr (vm_t *vm, const char *s, ...)
+{
+  vm->signals.continue_exec = 0;
+
+  va_list args;
+  va_start (args, s);
+
+  vsnprintf (vm->err, sizeof (vm->err), s, args);
+
+  va_end (args);
 }
 
 /*

@@ -783,6 +783,7 @@ sf_ast_gen (TokenSM *smt)
                 TokenSM tsmt;
                 tsmt.vals = smtv;
                 tsmt.vl = block_end - smtv;
+                tsmt.line = smt->line;
 
                 // for (int i = 0; i < tsmt.vl; i++)
                 //   sf_token_print (tsmt.vals[i]);
@@ -816,6 +817,8 @@ sf_ast_gen (TokenSM *smt)
                 st.v.s_fundecl.body = body_smt->vals;
                 st.v.s_fundecl.bl = body_smt->vl;
                 st.v.s_fundecl.name = name;
+
+                smt->line = tsmt.line;
 
                 smtv = block_end;
                 res->vals[res->vl++] = st;

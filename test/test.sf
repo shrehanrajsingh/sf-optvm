@@ -2,4 +2,8 @@ class Test
     a = 20
 
 a = Test ()
-putln (a.b)
+
+fun test (a)
+    putln (a.b)
+
+test (a)
