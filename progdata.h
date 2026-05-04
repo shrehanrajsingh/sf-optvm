@@ -4,7 +4,7 @@
 #include "header.h"
 
 /* lines are zero-indexed */
-struct __typed_str
+struct __progd_str
 {
   char **lines;
   size_t lc;
@@ -13,7 +13,7 @@ struct __typed_str
   size_t curr_line;
 };
 
-typedef struct __typed_str progdata_t;
+typedef struct __progd_str progdata_t;
 
 #define SF_PROGDATA_LC_CAP (64)
 

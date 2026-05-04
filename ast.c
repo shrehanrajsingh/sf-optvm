@@ -108,6 +108,10 @@ sf_ast_gen (TokenSM *smt)
 
       switch (tok.type)
         {
+        case TOK_NEWLINE:
+          ++smt->line;
+          break;
+
         case TOK_OPERATOR:
           {
             const char *op = tok.v.t_operator.value;
@@ -191,6 +195,7 @@ sf_ast_gen (TokenSM *smt)
               l0:;
 
                 stmt_t st;
+                st.line = smt->line;
                 st.type = STMT_VARDECL;
 
                 // here;
@@ -338,6 +343,8 @@ sf_ast_gen (TokenSM *smt)
                         && t.v.t_operator.value[0] == ')');
 
                 stmt_t st;
+                st.line = smt->line;
+
                 st.type = STMT_FUNCALL;
                 st.v.s_funcall.name = sf_expr_gen (smt_back, smtv);
                 st.v.s_funcall.args = args;
@@ -413,6 +420,8 @@ sf_ast_gen (TokenSM *smt)
                   }
 
                 stmt_t st;
+                st.line = smt->line;
+
                 st.type = STMT_IFBLOCK;
                 st.v.s_ifblock.body = body_smt->vals;
                 st.v.s_ifblock.bl = body_smt->vl;
@@ -560,6 +569,8 @@ sf_ast_gen (TokenSM *smt)
                   }
 
                 stmt_t st;
+                st.line = smt->line;
+
                 st.type = STMT_WHILE;
                 st.v.s_while.cond = cond;
                 st.v.s_while.body = body_smt->vals;
@@ -687,6 +698,8 @@ sf_ast_gen (TokenSM *smt)
                   }
 
                 stmt_t st;
+                st.line = smt->line;
+
                 st.type = STMT_FOR;
                 st.v.s_for.bl = body_smt->vl;
                 st.v.s_for.body = body_smt->vals;
@@ -795,6 +808,8 @@ sf_ast_gen (TokenSM *smt)
                   }
 
                 stmt_t st;
+                st.line = smt->line;
+
                 st.type = STMT_FUNDECL;
                 st.v.s_fundecl.argc = al;
                 st.v.s_fundecl.args = args;
@@ -815,6 +830,8 @@ sf_ast_gen (TokenSM *smt)
                   {
                     /* return none */
                     stmt_t st;
+                    st.line = smt->line;
+
                     st.type = STMT_RETURN;
                     expr_t *re = SFMALLOC (sizeof (*re));
                     re->type = EXPR_CONST;
@@ -851,6 +868,8 @@ sf_ast_gen (TokenSM *smt)
                     expr_t *re = sf_expr_gen (x, y);
 
                     stmt_t st;
+                    st.line = smt->line;
+
                     st.type = STMT_RETURN;
                     st.v.s_return.v = re;
                     res->vals[res->vl++] = st;
@@ -872,6 +891,7 @@ sf_ast_gen (TokenSM *smt)
                 TokenSM tsmt;
                 tsmt.vals = smtv;
                 tsmt.vl = block_end - smtv;
+                tsmt.line = smt->line;
 
                 // for (int i = 0; i < tsmt.vl; i++)
                 //   sf_token_print (tsmt.vals[i]);
@@ -897,10 +917,14 @@ sf_ast_gen (TokenSM *smt)
                   }
 
                 stmt_t st;
+                st.line = smt->line;
+
                 st.type = STMT_CLASSDECL;
                 st.v.s_classdecl.name = name;
                 st.v.s_classdecl.body = body_smt->vals;
                 st.v.s_classdecl.bl = body_smt->vl;
+
+                smt->line = tsmt.line;
 
                 res->vals[res->vl++] = st;
                 smtv = block_end;
@@ -921,6 +945,8 @@ sf_ast_gen (TokenSM *smt)
                 const char *alias = tok.v.t_identifier.value;
 
                 stmt_t st;
+                st.line = smt->line;
+
                 st.type = STMT_IMPORT;
                 st.v.s_import.alias = alias;
                 st.v.s_import.path = path;
@@ -938,6 +964,8 @@ sf_ast_gen (TokenSM *smt)
     }
 
   stmt_t st;
+  st.line = smt->line;
+
   st.type = STMT_EOF;
 
   if (res->vl >= res->vc)

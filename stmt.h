@@ -22,6 +22,7 @@ enum StmtType
 typedef struct __stmt_s
 {
   int type;
+  size_t line;
 
   union
   {

@@ -34,6 +34,7 @@ struct arith_s;
 typedef struct __expr_s
 {
   int type;
+  size_t line;
 
   union
   {

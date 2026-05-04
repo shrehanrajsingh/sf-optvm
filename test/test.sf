@@ -1,4 +1,5 @@
-a = [1, 2, 3]
-b = a[2]
+class Test
+    a = 20
 
-putln (b)
+a = Test ()
+putln (a.b)

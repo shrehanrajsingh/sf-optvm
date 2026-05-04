@@ -3,6 +3,7 @@
 #include "codegen.h"
 #include "mod.h"
 #include "natives.h"
+#include "progdata.h"
 #include "token.h"
 
 static const_t __sf_none_obj = (const_t){ .type = CONST_NONE };
@@ -42,6 +43,9 @@ sf_vm_new ()
   v.meta.l_slot = 0;
   v.meta.n_slot = 0;
   v.mod_store = sf_modstore_new ();
+
+  v.pg = SFMALLOC (sizeof (*v.pg));
+  *v.pg = sf_progdata_new ();
 
   for (int i = 0; i < v.globals_cap; i++)
     v.globals[i] = NULL;
@@ -849,6 +853,8 @@ start:;
             if (o == NULL)
               {
                 printf ("member '%s' does not exist.\n", name);
+                printf ("line %d: %s\n", i.meta.line,
+                        vm->pg->lines[i.meta.line]);
                 exit (EXIT_FAILURE);
               }
 

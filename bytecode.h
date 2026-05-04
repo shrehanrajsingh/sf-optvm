@@ -56,6 +56,13 @@ typedef struct _inst_s
   int b;
   char *c;
 
+  struct
+  {
+    size_t line;
+    size_t offset;
+
+  } meta;
+
 } instr_t;
 
 enum FrameType
@@ -140,9 +147,10 @@ typedef struct _vm_s
     size_t g_slot; /* global slot count */
     size_t l_slot; /* local slot count */
     size_t n_slot; /* name slot count */
+
   } meta;
 
-  progdata_t pg;
+  progdata_t *pg;
 
 } vm_t;
 

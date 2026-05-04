@@ -201,11 +201,13 @@ sf_vm_gen_b_fromexpr (vm_t *vm, expr_t e)
 
         if (v->slot == SF_VM_SLOT_GLOBAL)
           {
-            add_inst (vm, (instr_t){
-                              .op = OP_LOAD,
-                              .a = v->pos,
-                              .b = 0,
-                          });
+            add_inst (vm, (instr_t){ .op = OP_LOAD,
+                                     .a = v->pos,
+                                     .b = 0,
+                                     .meta = {
+                                         .line = e.line,
+                                         .offset = 0,
+                                     } });
           }
         else if (v->slot == SF_VM_SLOT_LOCAL)
           {
@@ -215,14 +217,21 @@ sf_vm_gen_b_fromexpr (vm_t *vm, expr_t e)
                     .op = OP_LOAD_FAST,
                     .a = v->pos,
                     .b = lev, /* how many frames up can we find the variable */
-                });
+                    .meta = {
+                        .line = e.line,
+                        .offset = 0,
+                    } });
           }
         else if (v->slot == SF_VM_SLOT_NAME)
           {
             add_inst (vm, (instr_t){ .op = OP_LOAD_NAME,
                                      .a = v->pos,
                                      .b = lev,
-                                     .c = (char *)SFSTRDUP (e.v.e_var.v) });
+                                     .c = (char *)SFSTRDUP (e.v.e_var.v),
+                                     .meta = {
+                                         .line = e.line,
+                                         .offset = 0,
+                                     } });
           }
       }
       break;
@@ -245,11 +254,13 @@ sf_vm_gen_b_fromexpr (vm_t *vm, expr_t e)
 
         if (found)
           {
-            add_inst (vm, (instr_t){
-                              .op = OP_LOAD_CONST,
-                              .a = j,
-                              .b = 0,
-                          });
+            add_inst (vm, (instr_t){ .op = OP_LOAD_CONST,
+                                     .a = j,
+                                     .b = 0,
+                                     .meta = {
+                                         .line = e.line,
+                                         .offset = 0,
+                                     } });
           }
         else
           {
@@ -262,11 +273,13 @@ sf_vm_gen_b_fromexpr (vm_t *vm, expr_t e)
 
             vm->map_consts[vm->s_ml++] = sf_const_copy (d);
 
-            add_inst (vm, (instr_t){
-                              .op = OP_LOAD_CONST,
-                              .a = vm->s_ml - 1,
-                              .b = 0,
-                          });
+            add_inst (vm, (instr_t){ .op = OP_LOAD_CONST,
+                                     .a = vm->s_ml - 1,
+                                     .b = 0,
+                                     .meta = {
+                                         .line = e.line,
+                                         .offset = 0,
+                                     } });
           }
       }
       break;
@@ -275,11 +288,13 @@ sf_vm_gen_b_fromexpr (vm_t *vm, expr_t e)
       {
         sf_vm_gen_b_fromexpr (vm, *e.v.e_add_one.v);
 
-        add_inst (vm, (instr_t){
-                          .op = OP_ADD_1,
-                          .a = 0,
-                          .b = 0,
-                      });
+        add_inst (vm, (instr_t){ .op = OP_ADD_1,
+                                 .a = 0,
+                                 .b = 0,
+                                 .meta = {
+                                     .line = e.line,
+                                     .offset = 0,
+                                 } });
       }
       break;
 
@@ -306,27 +321,33 @@ sf_vm_gen_b_fromexpr (vm_t *vm, expr_t e)
 
                 if (*op == '+')
                   {
-                    add_inst (vm, (instr_t){
-                                      .op = OP_ADD,
-                                      .a = 0,
-                                      .b = 0,
-                                  });
+                    add_inst (vm, (instr_t){ .op = OP_ADD,
+                                             .a = 0,
+                                             .b = 0,
+                                             .meta = {
+                                                 .line = e.line,
+                                                 .offset = 0,
+                                             } });
                   }
                 else if (*op == '-')
                   {
-                    add_inst (vm, (instr_t){
-                                      .op = OP_SUB,
-                                      .a = 0,
-                                      .b = 0,
-                                  });
+                    add_inst (vm, (instr_t){ .op = OP_SUB,
+                                             .a = 0,
+                                             .b = 0,
+                                             .meta = {
+                                                 .line = e.line,
+                                                 .offset = 0,
+                                             } });
                   }
                 else if (*op == '*')
                   {
-                    add_inst (vm, (instr_t){
-                                      .op = OP_MUL,
-                                      .a = 0,
-                                      .b = 0,
-                                  });
+                    add_inst (vm, (instr_t){ .op = OP_MUL,
+                                             .a = 0,
+                                             .b = 0,
+                                             .meta = {
+                                                 .line = e.line,
+                                                 .offset = 0,
+                                             } });
                   }
 
                 x++;
@@ -346,11 +367,14 @@ sf_vm_gen_b_fromexpr (vm_t *vm, expr_t e)
 
         sf_vm_gen_b_fromexpr (vm, *name);
 
-        add_inst (vm, (instr_t){
-                          .op = OP_CALL,
-                          .a = al,
-                          .b = 1, /* 1 means push the return value to stack */
-                      });
+        add_inst (
+            vm, (instr_t){ .op = OP_CALL,
+                           .a = al,
+                           .b = 1, /* 1 means push the return value to stack */
+                           .meta = {
+                               .line = e.line,
+                               .offset = 0,
+                           } });
       }
       break;
 
@@ -359,7 +383,13 @@ sf_vm_gen_b_fromexpr (vm_t *vm, expr_t e)
         sf_vm_gen_b_fromexpr (vm, *e.v.e_cmp.left);
         sf_vm_gen_b_fromexpr (vm, *e.v.e_cmp.right);
 
-        add_inst (vm, (instr_t){ .op = OP_CMP, .a = e.v.e_cmp.type, .b = 0 });
+        add_inst (vm, (instr_t){ .op = OP_CMP,
+                                 .a = e.v.e_cmp.type,
+                                 .b = 0,
+                                 .meta = {
+                                     .line = e.line,
+                                     .offset = 0,
+                                 } });
       }
       break;
 
@@ -370,7 +400,11 @@ sf_vm_gen_b_fromexpr (vm_t *vm, expr_t e)
         add_inst (vm, (instr_t){ .op = OP_DOT_ACCESS,
                                  .a = 0,
                                  .b = 0,
-                                 .c = SFSTRDUP (e.v.e_dota.right) });
+                                 .c = SFSTRDUP (e.v.e_dota.right),
+                                 .meta = {
+                                     .line = e.line,
+                                     .offset = 0,
+                                 } });
       }
       break;
 
@@ -381,11 +415,13 @@ sf_vm_gen_b_fromexpr (vm_t *vm, expr_t e)
             sf_vm_gen_b_fromexpr (vm, *e.v.e_array.vals[i]);
           }
 
-        add_inst (vm, (instr_t){
-                          .op = OP_LOAD_ARRAY,
-                          .a = e.v.e_array.vl,
-                          .b = 0,
-                      });
+        add_inst (vm, (instr_t){ .op = OP_LOAD_ARRAY,
+                                 .a = e.v.e_array.vl,
+                                 .b = 0,
+                                 .meta = {
+                                     .line = e.line,
+                                     .offset = 0,
+                                 } });
       }
       break;
 
@@ -394,11 +430,13 @@ sf_vm_gen_b_fromexpr (vm_t *vm, expr_t e)
         sf_vm_gen_b_fromexpr (vm, *e.v.e_sqr_access.parent);
         sf_vm_gen_b_fromexpr (vm, *e.v.e_sqr_access.idx);
 
-        add_inst (vm, (instr_t){
-                          .op = OP_SQR_ACCESS,
-                          .a = 0,
-                          .b = 0,
-                      });
+        add_inst (vm, (instr_t){ .op = OP_SQR_ACCESS,
+                                 .a = 0,
+                                 .b = 0,
+                                 .meta = {
+                                     .line = e.line,
+                                     .offset = 0,
+                                 } });
       }
       break;
 
@@ -419,17 +457,23 @@ sf_vm_gen_b_fromexpr (vm_t *vm, expr_t e)
                         .a = lval->v.e_const.v.v.c_int.v,
                         .b = rval->v.e_const.v.v.c_int.v,
                         .c = (char *)1, /* use c as step, I know, not ideal */
-                    });
+                        .meta = {
+                            .line = e.line,
+                            .offset = 0,
+                        } });
               }
             else
               {
                 if (EXPR_IS_INT (step))
-                  add_inst (vm, (instr_t){
-                                    .op = OP_RANGE_FAST,
-                                    .a = lval->v.e_const.v.v.c_int.v,
-                                    .b = rval->v.e_const.v.v.c_int.v,
-                                    .c = (char *)step->v.e_const.v.v.c_int.v,
-                                });
+                  add_inst (
+                      vm, (instr_t){ .op = OP_RANGE_FAST,
+                                     .a = lval->v.e_const.v.v.c_int.v,
+                                     .b = rval->v.e_const.v.v.c_int.v,
+                                     .c = (char *)step->v.e_const.v.v.c_int.v,
+                                     .meta = {
+                                         .line = e.line,
+                                         .offset = 0,
+                                     } });
               }
           }
         else
@@ -448,7 +492,10 @@ sf_vm_gen_b_fromexpr (vm_t *vm, expr_t e)
                         .a = (step != NULL), /* 1 -> has step, 0 -> step = 1 */
                         .b = 0,
                         .c = NULL,
-                    });
+                        .meta = {
+                            .line = e.line,
+                            .offset = 0,
+                        } });
           }
       }
       break;
@@ -474,6 +521,7 @@ sf_vm_gen_bytecode (vm_t *vm, StmtSM *smt)
 
         case STMT_VARDECL:
           {
+            s->v.s_vardecl.val->line = s->line;
             sf_vm_gen_b_fromexpr (vm, *s->v.s_vardecl.val);
 
             expr_t *name = s->v.s_vardecl.name;
@@ -485,47 +533,64 @@ sf_vm_gen_bytecode (vm_t *vm, StmtSM *smt)
                   vval_t *v = add_var (vm, (char *)name->v.e_var.v);
 
                   if (v->slot == SF_VM_SLOT_LOCAL)
-                    add_inst (vm, (instr_t){
-                                      .op = OP_STORE_FAST,
-                                      .a = v->pos,
-                                      .b = 0,
-                                  });
-                  else if (v->slot == SF_VM_SLOT_GLOBAL)
-                    add_inst (vm, (instr_t){
-                                      .op = OP_STORE,
-                                      .a = v->pos,
-                                      .b = 0,
-                                  });
-                  else if (v->slot == SF_VM_SLOT_NAME)
-                    add_inst (vm, (instr_t){ .op = OP_STORE_NAME,
+                    add_inst (vm, (instr_t){ .op = OP_STORE_FAST,
                                              .a = v->pos,
                                              .b = 0,
-                                             .c = (char *)SFSTRDUP (
-                                                 name->v.e_var.v) });
+                                             .meta = {
+                                                 .line = s->line,
+                                                 .offset = 0,
+                                             } });
+                  else if (v->slot == SF_VM_SLOT_GLOBAL)
+                    add_inst (vm, (instr_t){ .op = OP_STORE,
+                                             .a = v->pos,
+                                             .b = 0,
+                                             .meta = {
+                                                 .line = s->line,
+                                                 .offset = 0,
+                                             } });
+                  else if (v->slot == SF_VM_SLOT_NAME)
+                    add_inst (
+                        vm, (instr_t){ .op = OP_STORE_NAME,
+                                       .a = v->pos,
+                                       .b = 0,
+                                       .c = (char *)SFSTRDUP (name->v.e_var.v),
+                                       .meta = {
+                                           .line = s->line,
+                                           .offset = 0,
+                                       } });
                 }
                 break;
               case EXPR_DOT_ACCESS:
                 {
+                  name->v.e_dota.left->line = name->line;
                   sf_vm_gen_b_fromexpr (vm, *name->v.e_dota.left);
 
                   add_inst (vm, (instr_t){ .op = OP_STORE_NAME,
                                            .a = 0,
                                            .b = 1,
                                            .c = (char *)SFSTRDUP (
-                                               name->v.e_dota.right) });
+                                               name->v.e_dota.right),
+                                           .meta = {
+                                               .line = s->line,
+                                               .offset = 0,
+                                           } });
                 }
                 break;
 
               case EXPR_SQUARE_ACCESS:
                 {
+                  name->v.e_sqr_access.idx->line = name->line;
+                  name->v.e_sqr_access.parent->line = name->line;
                   sf_vm_gen_b_fromexpr (vm, *name->v.e_sqr_access.idx);
                   sf_vm_gen_b_fromexpr (vm, *name->v.e_sqr_access.parent);
 
-                  add_inst (vm, (instr_t){
-                                    .op = OP_STORE_SQR,
-                                    .a = 0,
-                                    .b = 0,
-                                });
+                  add_inst (vm, (instr_t){ .op = OP_STORE_SQR,
+                                           .a = 0,
+                                           .b = 0,
+                                           .meta = {
+                                               .line = s->line,
+                                               .offset = 0,
+                                           } });
                 }
                 break;
 
@@ -544,15 +609,19 @@ sf_vm_gen_bytecode (vm_t *vm, StmtSM *smt)
             for (size_t i = 0; i < argc; i++)
               {
                 // sf_expr_print (*args[i]);
+                args[i]->line = s->line;
                 sf_vm_gen_b_fromexpr (vm, *args[i]);
               }
 
+            name->line = s->line;
             sf_vm_gen_b_fromexpr (vm, *name);
-            add_inst (vm, (instr_t){
-                              .op = OP_CALL,
-                              .a = argc,
-                              .b = 0,
-                          });
+            add_inst (vm, (instr_t){ .op = OP_CALL,
+                                     .a = argc,
+                                     .b = 0,
+                                     .meta = {
+                                         .line = s->line,
+                                         .offset = 0,
+                                     } });
           }
           break;
 
@@ -564,13 +633,16 @@ sf_vm_gen_bytecode (vm_t *vm, StmtSM *smt)
             size_t ebl = s->v.s_ifblock.else_bl;
             stmt_t *else_body = s->v.s_ifblock.else_body;
 
+            cond->line = s->line;
             sf_vm_gen_b_fromexpr (vm, *cond);
 
-            add_inst (vm, (instr_t){
-                              .op = OP_JUMP_IF_FALSE,
-                              .a = 0,
-                              .b = 0,
-                          });
+            add_inst (vm, (instr_t){ .op = OP_JUMP_IF_FALSE,
+                                     .a = 0,
+                                     .b = 0,
+                                     .meta = {
+                                         .line = s->line,
+                                         .offset = 0,
+                                     } });
 
             size_t pl = vm->inst_len - 1;
 
@@ -581,11 +653,13 @@ sf_vm_gen_bytecode (vm_t *vm, StmtSM *smt)
             sf_vm_gen_bytecode (vm, &smt);
             vm->inst_len--; // eat return
 
-            add_inst (vm, (instr_t){
-                              .op = OP_JUMP,
-                              .a = 0,
-                              .b = 0,
-                          });
+            add_inst (vm, (instr_t){ .op = OP_JUMP,
+                                     .a = 0,
+                                     .b = 0,
+                                     .meta = {
+                                         .line = s->line,
+                                         .offset = 0,
+                                     } });
 
             size_t ql = vm->inst_len - 1;
             vm->insts[pl] = (instr_t){
@@ -620,14 +694,17 @@ sf_vm_gen_bytecode (vm_t *vm, StmtSM *smt)
             size_t vl = vm->inst_len;
 
             // write condition to check
+            cond->line = s->line;
             sf_vm_gen_b_fromexpr (vm, *cond);
 
             // jump to end of loop if condition is false
-            add_inst (vm, (instr_t){
-                              .op = OP_JUMP_IF_FALSE,
-                              .a = 0,
-                              .b = 0,
-                          });
+            add_inst (vm, (instr_t){ .op = OP_JUMP_IF_FALSE,
+                                     .a = 0,
+                                     .b = 0,
+                                     .meta = {
+                                         .line = s->line,
+                                         .offset = 0,
+                                     } });
 
             size_t il = vm->inst_len - 1;
             /**
@@ -650,11 +727,13 @@ sf_vm_gen_bytecode (vm_t *vm, StmtSM *smt)
             vm->inst_len--; // eat return
 
             // D (printf ("%d\n", vl));
-            add_inst (vm, (instr_t){
-                              .op = OP_JUMP,
-                              .a = vl,
-                              .b = 0,
-                          });
+            add_inst (vm, (instr_t){ .op = OP_JUMP,
+                                     .a = vl,
+                                     .b = 0,
+                                     .meta = {
+                                         .line = s->line,
+                                         .offset = 0,
+                                     } });
 
             // D (printf ("%d\n", vm->inst_len));
             vm->insts[il] = (instr_t){
@@ -709,22 +788,26 @@ sf_vm_gen_bytecode (vm_t *vm, StmtSM *smt)
             smt.vals = body;
             smt.vl = smt.vc = bl;
 
-            add_inst (vm, (instr_t){
-                              .op = OP_JUMP,
-                              .a = 0,
-                              .b = 0,
-                          });
+            add_inst (vm, (instr_t){ .op = OP_JUMP,
+                                     .a = 0,
+                                     .b = 0,
+                                     .meta = {
+                                         .line = s->line,
+                                         .offset = 0,
+                                     } });
 
             size_t pl = vm->inst_len - 1;
             size_t ql = vm->inst_len;
 
             for (size_t i = 0; i < vltc; i++)
               {
-                add_inst (vm, (instr_t){
-                                  .op = OP_STORE_FAST,
-                                  .a = vlt[i]->pos,
-                                  .b = 0,
-                              });
+                add_inst (vm, (instr_t){ .op = OP_STORE_FAST,
+                                         .a = vlt[i]->pos,
+                                         .b = 0,
+                                         .meta = {
+                                             .line = s->line,
+                                             .offset = 0,
+                                         } });
               }
 
             sf_vm_gen_bytecode (vm, &smt);
@@ -738,11 +821,13 @@ sf_vm_gen_bytecode (vm_t *vm, StmtSM *smt)
               .b = 0,
             };
 
-            add_inst (vm, (instr_t){
-                              .op = OP_LOAD_FUNC_CODED,
-                              .a = ql,
-                              .b = argc,
-                          });
+            add_inst (vm, (instr_t){ .op = OP_LOAD_FUNC_CODED,
+                                     .a = ql,
+                                     .b = argc,
+                                     .meta = {
+                                         .line = s->line,
+                                         .offset = 0,
+                                     } });
 
             // vm->ht = ht_pres;
             // sf_ht_free (ht);
@@ -753,29 +838,36 @@ sf_vm_gen_bytecode (vm_t *vm, StmtSM *smt)
               nl = add_var (vm, name);
 
             if (nl->slot == SF_VM_SLOT_LOCAL)
-              add_inst (vm, (instr_t){
-                                .op = OP_STORE_FAST,
-                                .a = nl->pos,
-                                .b = 0,
-                            });
+              add_inst (vm, (instr_t){ .op = OP_STORE_FAST,
+                                       .a = nl->pos,
+                                       .b = 0,
+                                       .meta = {
+                                           .line = s->line,
+                                           .offset = 0,
+                                       } });
             else if (nl->slot == SF_VM_SLOT_GLOBAL)
-              add_inst (vm, (instr_t){
-                                .op = OP_STORE,
-                                .a = nl->pos,
-                                .b = 0,
-                            });
+              add_inst (vm, (instr_t){ .op = OP_STORE,
+                                       .a = nl->pos,
+                                       .b = 0,
+                                       .meta = {
+                                           .line = s->line,
+                                           .offset = 0,
+                                       } });
             else if (nl->slot == SF_VM_SLOT_NAME)
-              add_inst (vm, (instr_t){
-                                .op = OP_STORE_NAME,
-                                .a = nl->pos,
-                                .b = 0,
-                                .c = (char *)SFSTRDUP (name),
-                            });
+              add_inst (vm, (instr_t){ .op = OP_STORE_NAME,
+                                       .a = nl->pos,
+                                       .b = 0,
+                                       .c = (char *)SFSTRDUP (name),
+                                       .meta = {
+                                           .line = s->line,
+                                           .offset = 0,
+                                       } });
           }
           break;
 
         case STMT_RETURN:
           {
+            s->v.s_return.v->line = s->line;
             sf_vm_gen_b_fromexpr (vm, *s->v.s_return.v);
 
             add_inst (vm,
@@ -783,7 +875,10 @@ sf_vm_gen_bytecode (vm_t *vm, StmtSM *smt)
                           .op = OP_RETURN,
                           .a = 1, /* 1 means the return is coded by the user */
                           .b = 0,
-                      });
+                          .meta = {
+                              .line = s->line,
+                              .offset = 0,
+                          } });
           }
           break;
 
@@ -793,12 +888,15 @@ sf_vm_gen_bytecode (vm_t *vm, StmtSM *smt)
             stmt_t *body = s->v.s_classdecl.body;
             const char *name = s->v.s_classdecl.name;
 
-            add_inst (vm, (instr_t){
-                              .op = OP_LOAD_BUILDCLASS,
-                              .a = 0, /* the corresponding LOAD_BUILDEND */
-                              .b = 0,
-                              .c = (char *)name,
-                          });
+            add_inst (vm,
+                      (instr_t){ .op = OP_LOAD_BUILDCLASS,
+                                 .a = 0, /* the corresponding LOAD_BUILDEND */
+                                 .b = 0,
+                                 .c = (char *)name,
+                                 .meta = {
+                                     .line = s->line,
+                                     .offset = 0,
+                                 } });
 
             size_t il = vm->inst_len - 1;
 
@@ -820,11 +918,14 @@ sf_vm_gen_bytecode (vm_t *vm, StmtSM *smt)
 
             RESTORE (vm);
 
-            add_inst (vm, (instr_t){
-                              .op = OP_LOAD_BUILDCLASS_END,
-                              .a = il, /* the corresponding LOAD_BUILDCLASS */
-                              .b = 0,
-                          });
+            add_inst (
+                vm, (instr_t){ .op = OP_LOAD_BUILDCLASS_END,
+                               .a = il, /* the corresponding LOAD_BUILDCLASS */
+                               .b = 0,
+                               .meta = {
+                                   .line = s->line,
+                                   .offset = 0,
+                               } });
 
             vm->insts[il] = (instr_t){
               .op = OP_LOAD_BUILDCLASS,
@@ -834,24 +935,30 @@ sf_vm_gen_bytecode (vm_t *vm, StmtSM *smt)
             };
 
             if (vm->meta.slot == SF_VM_SLOT_GLOBAL)
-              add_inst (vm, (instr_t){
-                                .op = OP_STORE,
-                                .a = nl->pos,
-                                .b = 0,
-                            });
+              add_inst (vm, (instr_t){ .op = OP_STORE,
+                                       .a = nl->pos,
+                                       .b = 0,
+                                       .meta = {
+                                           .line = s->line,
+                                           .offset = 0,
+                                       } });
             else if (vm->meta.slot == SF_VM_SLOT_LOCAL)
-              add_inst (vm, (instr_t){
-                                .op = OP_STORE_FAST,
-                                .a = nl->pos,
-                                .b = 0,
-                            });
+              add_inst (vm, (instr_t){ .op = OP_STORE_FAST,
+                                       .a = nl->pos,
+                                       .b = 0,
+                                       .meta = {
+                                           .line = s->line,
+                                           .offset = 0,
+                                       } });
             else if (vm->meta.slot == SF_VM_SLOT_NAME)
-              add_inst (vm, (instr_t){
-                                .op = OP_STORE_NAME,
-                                .a = nl->pos,
-                                .b = 0,
-                                .c = (char *)SFSTRDUP (name),
-                            });
+              add_inst (vm, (instr_t){ .op = OP_STORE_NAME,
+                                       .a = nl->pos,
+                                       .b = 0,
+                                       .c = (char *)SFSTRDUP (name),
+                                       .meta = {
+                                           .line = s->line,
+                                           .offset = 0,
+                                       } });
           }
           break;
 
@@ -860,13 +967,16 @@ sf_vm_gen_bytecode (vm_t *vm, StmtSM *smt)
             stmt_t *body = s->v.s_for.body;
             size_t bl = s->v.s_for.bl;
 
+            s->v.s_for.cond->line = s->line;
             sf_vm_gen_b_fromexpr (vm, *s->v.s_for.cond);
 
-            add_inst (vm, (instr_t){
-                              .op = OP_GET_ITER,
-                              .a = 0,
-                              .b = 0,
-                          });
+            add_inst (vm, (instr_t){ .op = OP_GET_ITER,
+                                     .a = 0,
+                                     .b = 0,
+                                     .meta = {
+                                         .line = s->line,
+                                         .offset = 0,
+                                     } });
 
             size_t jl = vm->inst_len;
 
@@ -879,7 +989,10 @@ sf_vm_gen_bytecode (vm_t *vm, StmtSM *smt)
                     .b = s->v.s_for.vl, /* this stores the number of ways you
                                want to split any value of an iterable into
                                (typically number of decomposition variables) */
-                });
+                    .meta = {
+                        .line = s->line,
+                        .offset = 0,
+                    } });
 
             size_t il = vm->inst_len;
 
@@ -889,23 +1002,31 @@ sf_vm_gen_bytecode (vm_t *vm, StmtSM *smt)
                 vval_t *v = add_var (vm, (char *)name->v.e_var.v);
 
                 if (v->slot == SF_VM_SLOT_LOCAL)
-                  add_inst (vm, (instr_t){
-                                    .op = OP_STORE_FAST,
-                                    .a = v->pos,
-                                    .b = 0,
-                                });
+                  add_inst (vm, (instr_t){ .op = OP_STORE_FAST,
+                                           .a = v->pos,
+                                           .b = 0,
+                                           .meta = {
+                                               .line = s->line,
+                                               .offset = 0,
+                                           } });
                 else if (v->slot == SF_VM_SLOT_GLOBAL)
-                  add_inst (vm, (instr_t){
-                                    .op = OP_STORE,
-                                    .a = v->pos,
-                                    .b = 0,
-                                });
+                  add_inst (vm, (instr_t){ .op = OP_STORE,
+                                           .a = v->pos,
+                                           .b = 0,
+                                           .meta = {
+                                               .line = s->line,
+                                               .offset = 0,
+                                           } });
                 else if (v->slot == SF_VM_SLOT_NAME)
-                  add_inst (vm, (instr_t){
-                                    .op = OP_STORE_NAME,
-                                    .a = v->pos,
-                                    .b = 0,
-                                    .c = (char *)SFSTRDUP (name->v.e_var.v) });
+                  add_inst (vm,
+                            (instr_t){ .op = OP_STORE_NAME,
+                                       .a = v->pos,
+                                       .b = 0,
+                                       .c = (char *)SFSTRDUP (name->v.e_var.v),
+                                       .meta = {
+                                           .line = s->line,
+                                           .offset = 0,
+                                       } });
               }
 
             StmtSM smt;
@@ -922,11 +1043,13 @@ sf_vm_gen_bytecode (vm_t *vm, StmtSM *smt)
             vm->inst_len--; // eat return
 
             // D (printf ("%d\n", vl));
-            add_inst (vm, (instr_t){
-                              .op = OP_JUMP,
-                              .a = jl,
-                              .b = 0,
-                          });
+            add_inst (vm, (instr_t){ .op = OP_JUMP,
+                                     .a = jl,
+                                     .b = 0,
+                                     .meta = {
+                                         .line = s->line,
+                                         .offset = 0,
+                                     } });
 
             // D (printf ("%d\n", vm->inst_len));
 
@@ -939,39 +1062,51 @@ sf_vm_gen_bytecode (vm_t *vm, StmtSM *smt)
             const char *alias = SFSTRDUP (s->v.s_import.alias);
             const char *path = SFSTRDUP (s->v.s_import.path);
 
-            add_inst (vm, (instr_t){
-                              .op = OP_IMPORT,
-                              .a = 0,
-                              .b = 0,
-                              .c = path,
-                          });
+            add_inst (vm, (instr_t){ .op = OP_IMPORT,
+                                     .a = 0,
+                                     .b = 0,
+                                     .c = path,
+                                     .meta = {
+                                         .line = s->line,
+                                         .offset = 0,
+                                     } });
 
-            add_inst (vm, (instr_t){
-                              .op = OP_IMPORT_ALIAS,
-                              .a = 0,
-                              .b = 0,
-                              .c = alias,
-                          });
+            add_inst (vm, (instr_t){ .op = OP_IMPORT_ALIAS,
+                                     .a = 0,
+                                     .b = 0,
+                                     .c = alias,
+                                     .meta = {
+                                         .line = s->line,
+                                         .offset = 0,
+                                     } });
 
             vval_t *v = add_var (vm, (char *)alias);
 
             if (v->slot == SF_VM_SLOT_LOCAL)
-              add_inst (vm, (instr_t){
-                                .op = OP_STORE_FAST,
-                                .a = v->pos,
-                                .b = 0,
-                            });
+              add_inst (vm, (instr_t){ .op = OP_STORE_FAST,
+                                       .a = v->pos,
+                                       .b = 0,
+                                       .meta = {
+                                           .line = s->line,
+                                           .offset = 0,
+                                       } });
             else if (v->slot == SF_VM_SLOT_GLOBAL)
-              add_inst (vm, (instr_t){
-                                .op = OP_STORE,
-                                .a = v->pos,
-                                .b = 0,
-                            });
+              add_inst (vm, (instr_t){ .op = OP_STORE,
+                                       .a = v->pos,
+                                       .b = 0,
+                                       .meta = {
+                                           .line = s->line,
+                                           .offset = 0,
+                                       } });
             else if (v->slot == SF_VM_SLOT_NAME)
               add_inst (vm, (instr_t){ .op = OP_STORE_NAME,
                                        .a = v->pos,
                                        .b = 0,
-                                       .c = (char *)SFSTRDUP (alias) });
+                                       .c = (char *)SFSTRDUP (alias),
+                                       .meta = {
+                                           .line = s->line,
+                                           .offset = 0,
+                                       } });
           }
           break;
 
@@ -982,10 +1117,16 @@ sf_vm_gen_bytecode (vm_t *vm, StmtSM *smt)
 
 end:;
 
-  add_inst (vm, (instr_t){
-                    .op = OP_RETURN,
-                    .a = 0, /* 0 means the user hasnt written a return
-                               anywhere, but the routine has to end somehow */
-                    .b = 0,
-                });
+  add_inst (
+      vm, (instr_t){ .op = OP_RETURN,
+                     .a = 0, /* 0 means the user hasnt written a return
+                                anywhere, but the routine has to end somehow */
+                     .b = 0,
+                     .meta = {
+                         .line = s != NULL ? s->line
+                                 : vm->inst_len
+                                     ? vm->insts[vm->inst_len - 1].meta.line
+                                     : 0,
+                         .offset = 0,
+                     } });
 }

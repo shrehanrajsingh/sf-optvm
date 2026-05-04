@@ -50,6 +50,35 @@ test3 ()
   here;
   vm_t vm = sf_vm_new ();
 
+  size_t n_lines = 0;
+  for (int i = 0; i < pos; i++)
+    if (buf[i] == '\n')
+      n_lines++;
+
+  size_t ll = 0;
+  n_lines = (n_lines / SF_PROGDATA_LC_CAP + 1) * SF_PROGDATA_LC_CAP;
+  char **lines = SFMALLOC (SF_PROGDATA_LC_CAP * sizeof (*lines));
+  size_t lo = 0; // last offset
+
+  int i;
+  for (i = 0; i < pos; i++)
+    {
+      if (buf[i] == '\n')
+        {
+          buf[i] = '\0';
+          lines[ll++] = buf + lo;
+          lo = i + 1;
+        }
+    }
+
+  if (lo != pos)
+    {
+      buf[i] = '\0';
+      lines[ll++] = buf + lo;
+    }
+
+  *vm.pg = sf_progdata_new_withLines (lines, ll);
+
   sf_natives_add_tovm (&vm);
 
   vm.fp = 1;

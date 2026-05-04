@@ -78,6 +78,8 @@ typedef struct
   size_t vl; /* size */
   size_t vc; /* capacity */
 
+  size_t line;
+
 } TokenSM;
 
 #define SF_TOKEN_STATEM_VALS_CAP (64)

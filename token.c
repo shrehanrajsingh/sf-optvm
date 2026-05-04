@@ -9,6 +9,7 @@ sf_statem_token_new (char *r)
   smt->vl = 0;
   smt->vc = SF_TOKEN_STATEM_VALS_CAP;
   smt->vals = SFMALLOC (smt->vc * sizeof (*smt->vals));
+  smt->line = 0;
 
   for (size_t i = 0; i < smt->vc; i++)
     smt->vals[i].type = -1;
