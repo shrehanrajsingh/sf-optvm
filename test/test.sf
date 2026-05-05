@@ -1,3 +1,2 @@
-while 1
-    a = 10 to 1 step -2
-    putln (a)
+a = 1
+putln (a.b)

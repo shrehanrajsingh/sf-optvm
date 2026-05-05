@@ -390,6 +390,9 @@ start:;
             obj_t *val = pop (vm);
 
             sqr_set (par, idx, val, vm);
+
+            if (!vm->signals.continue_exec)
+              goto end3;
           }
           break;
 
@@ -422,8 +425,7 @@ start:;
                 D (printf ("%d", ff->is_class));
                 if (ff == NULL || j == -1)
                   {
-                    printf ("name '%s' not found.", i.c);
-                    exit (EXIT_FAILURE);
+                    SET_ERROR ("name '%s' not found.", i.c);
                   }
 
                 // if (ff->n.names[i.a] != NULL && strcmp (ff->n.names[i.a],
@@ -532,8 +534,7 @@ start:;
             // assert (argc < 64 && "only 64 arguments allowed in a function");
             if (argc >= 64)
               {
-                printf ("only 64 arguments allowed in a function.\n");
-                exit (EXIT_FAILURE);
+                SET_ERROR ("only 64 arguments allowed in a function.\n");
               }
 
             while (al < argc)
@@ -549,6 +550,9 @@ start:;
             IR (name);
 
             _sf_call_fun (vm, name, args, al); /* handles DR (name, vm); */
+
+            if (!vm->signals.continue_exec)
+              goto end3;
 
             for (size_t j = 0; j < al; j++)
               {
@@ -647,10 +651,9 @@ start:;
                   }
                 else
                   {
-                    D (printf (
+                    SET_ERROR (
                         "string addition with type %d is not supported\n",
-                        r->type));
-                    exit (EXIT_FAILURE);
+                        r->type);
                   }
               }
 
@@ -917,7 +920,11 @@ start:;
             obj_t *idx = pop (vm);
             obj_t *par = pop (vm);
 
-            obj_t *o = sqr_access (par, idx);
+            obj_t *o = sqr_access (par, idx, vm);
+
+            if (!vm->signals.continue_exec)
+              goto end3;
+
             push (vm, o);
             IR (o);
 
@@ -1042,8 +1049,7 @@ start:;
               {
                 if (stp != NULL && !OBJ_IS_INT (stp))
                   {
-                    printf ("expected step to be an integer\n");
-                    exit (EXIT_FAILURE);
+                    SET_ERROR ("expected step to be an integer");
                   }
 
                 int lvi = lv->v.o_const.v.v.c_int.v;
@@ -1180,8 +1186,7 @@ start:;
 
             if (f == NULL)
               {
-                perror ("error reading file");
-                exit (EXIT_FAILURE);
+                SET_ERROR ("error reading file: %s", strerror (errno));
               }
 
             fseek (f, 0, SEEK_END);
@@ -1471,7 +1476,7 @@ start:;
     end3:;
       if (!vm->signals.continue_exec)
         {
-          printf ("err: %s\n", vm->err);
+          printf ("error: %s\n", vm->err);
 
           printf ("stack trace: \n");
           for (int j = vm->std->ll - 1; j >= 0; j--)
@@ -1936,7 +1941,7 @@ container_set (obj_t *p, char *n, obj_t *v, vm_t *vm)
 }
 
 SF_API obj_t *
-sqr_access (obj_t *p, obj_t *v)
+sqr_access (obj_t *p, obj_t *v, vm_t *vm)
 {
   obj_t *r = NULL;
   switch (p->type)
@@ -1950,8 +1955,7 @@ sqr_access (obj_t *p, obj_t *v)
 
         if (idx < 0 || (size_t)idx >= a->len)
           {
-            printf ("array index out of range\n");
-            exit (EXIT_FAILURE);
+            SET_ERROR ("array index out of range");
           }
 
         r = a->vals[idx];
@@ -1962,6 +1966,7 @@ sqr_access (obj_t *p, obj_t *v)
       break;
     }
 
+end3:;
   return r;
 }
 
@@ -1979,8 +1984,7 @@ sqr_set (obj_t *p, obj_t *i, obj_t *val, vm_t *vm)
 
         if (idx < 0 || (size_t)idx >= a->len)
           {
-            printf ("array index out of range\n");
-            exit (EXIT_FAILURE);
+            SET_ERROR ("array index out of range");
           }
 
         DR (a->vals[idx], vm);
@@ -1991,6 +1995,8 @@ sqr_set (obj_t *p, obj_t *i, obj_t *val, vm_t *vm)
     default:
       break;
     }
+
+end3:;
 }
 
 void
@@ -2005,8 +2011,7 @@ _sf_call_fun (vm_t *vm, obj_t *name, obj_t **args, size_t argc)
         fun_t *f = name->v.o_fun.v;
         if (argc >= 64)
           {
-            printf ("only 64 arguments allowed in a function\n");
-            exit (EXIT_FAILURE);
+            SET_ERROR ("only 64 arguments allowed in a function");
           }
 
         int remove_pf = 0;
@@ -2171,8 +2176,7 @@ _sf_call_fun (vm_t *vm, obj_t *name, obj_t **args, size_t argc)
           {
             if (argc >= 64)
               {
-                printf ("only 64 arguments allowed in a function\n");
-                exit (EXIT_FAILURE);
+                SET_ERROR ("only 64 arguments allowed in a function\n");
               }
 
             args[argc++] = e_args[i];
@@ -2196,6 +2200,7 @@ _sf_call_fun (vm_t *vm, obj_t *name, obj_t **args, size_t argc)
       break;
     }
 
+end3:;
   DR (name, vm);
 }
 

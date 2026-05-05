@@ -192,7 +192,7 @@ extern "C"
   SF_API void sf_vm_popframe (vm_t *);
   SF_API obj_t *container_access (obj_t *, char *);
   SF_API void container_set (obj_t *, char *, obj_t *, vm_t *);
-  SF_API obj_t *sqr_access (obj_t *, obj_t *);
+  SF_API obj_t *sqr_access (obj_t *, obj_t *, vm_t *);
   SF_API void sqr_set (obj_t *, obj_t *, obj_t *, vm_t *);
   SF_API void sf_vm_seterr (vm_t *, const char *, ...);
 
