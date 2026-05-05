@@ -18,6 +18,14 @@ void _sf_call_fun (vm_t *_VM, obj_t *_Name, obj_t **_Args, size_t _ArgCount);
   sf_std_pop (vm->std);                                                       \
   }
 
+#define SET_ERROR(...)                                                        \
+  do                                                                          \
+    {                                                                         \
+      sf_vm_seterr (vm, __VA_ARGS__);                                         \
+      goto end3;                                                              \
+    }                                                                         \
+  while (0);
+
 SF_API vm_t
 sf_vm_new ()
 {
@@ -531,7 +539,8 @@ start:;
             while (al < argc)
               {
                 args[al] = pop (vm);
-                IR (args[al]);
+                /* reuse the IR from stack push */
+                // IR (args[al]);
                 al++;
                 // sf_obj_print (*args[al - 1]);
                 // IR (args[al++]);
@@ -539,10 +548,11 @@ start:;
 
             IR (name);
 
-            _sf_call_fun (vm, name, args, al);
+            _sf_call_fun (vm, name, args, al); /* handles DR (name, vm); */
 
             for (size_t j = 0; j < al; j++)
               {
+                // D (printf ("%d\n", args[j]->meta.ref_count));
                 DR (args[j], vm);
               }
 
@@ -924,16 +934,61 @@ start:;
 
             if (step == 0)
               {
-                printf ("range step cannot be zero\n");
-                exit (EXIT_FAILURE);
+                // printf ("range step cannot be zero\n");
+                // exit (EXIT_FAILURE);
+                // sf_vm_seterr (vm, "range step cannot be zero\n");
+                // goto end3;
+
+                SET_ERROR ("range step cannot be 0");
               }
 
             if (lv < rv)
               {
+                if (step < 0)
+                  SET_ERROR ("infinite range [%d..%d step %d]", lv, rv, step);
+
                 array_t *a = sf_array_withsize (((rv - 1 - lv) / step) + 1);
 
                 int c = 0;
                 for (int j = lv; j < rv; j += step)
+                  {
+                    obj_t *o
+                        = sf_objstore_req_forconst ((const_t *)(const_t[]){ {
+                            .type = CONST_INT,
+                            .v.c_int.v = j,
+                        } });
+
+                    if (o == NULL)
+                      {
+                        o = sf_objstore_req ();
+                        o->type = OBJ_CONST;
+                        o->v.o_const.v.type = CONST_INT;
+                        o->v.o_const.v.v.c_int.v = j;
+                      }
+
+                    a->vals[c++] = o;
+                    IR (o);
+                  }
+
+                if (a->len != c)
+                  a->len = c;
+
+                obj_t *o = sf_objstore_req ();
+                o->type = OBJ_ARRAY;
+                o->v.o_array.v = a;
+
+                push (vm, o);
+                IR (o);
+              }
+            else
+              {
+                if (step > 0)
+                  SET_ERROR ("infinite range [%d..%d step %d]", lv, rv, step);
+
+                array_t *a = sf_array_withsize (((lv - 1 - rv) / (-step)) + 1);
+
+                int c = 0;
+                for (int j = lv; j > rv; j += step)
                   {
                     obj_t *o
                         = sf_objstore_req_forconst ((const_t *)(const_t[]){ {
