@@ -170,6 +170,9 @@ sf_vm_print_inst (instr_t i)
     case OP_IMPORT_ALIAS:
       printf ("OP_IMPORT_ALIAS: '%s' ", i.c);
       break;
+    case OP_LOAD_DICT:
+      printf ("OP_LOAD_DICT: ");
+      break;
     // case OP_STACK_POP:
     //   fputs ("OP_STACK_POP:", stdout);
     //   break;
@@ -181,7 +184,8 @@ sf_vm_print_inst (instr_t i)
       break;
     }
 
-  printf (" %d %d\n", i.a, i.b);
+  printf (" %d %d (meta: l(%lu) o(%lu))\n", i.a, i.b, i.meta.line,
+          i.meta.offset);
 }
 
 SF_API void
@@ -909,6 +913,25 @@ start:;
             obj_t *o = sf_objstore_req ();
             o->type = OBJ_ARRAY;
             o->v.o_array.v = ar;
+
+            push (vm, o);
+            IR (o);
+          }
+          break;
+
+        case OP_LOAD_DICT:
+          {
+            dict_t *d = sf_dict_withsize (i.a);
+
+            for (int j = i.a - 1; j > -1; j--)
+              {
+                d->vals[j] = pop (vm);
+                d->keys[j] = pop (vm);
+              }
+
+            obj_t *o = sf_objstore_req ();
+            o->type = OBJ_DICT;
+            o->v.o_dict.v = d;
 
             push (vm, o);
             IR (o);
@@ -1959,6 +1982,19 @@ sqr_access (obj_t *p, obj_t *v, vm_t *vm)
           }
 
         r = a->vals[idx];
+      }
+      break;
+
+    case OBJ_DICT:
+      {
+        obj_t *vll = sf_dict_get (p->v.o_dict.v, v);
+
+        if (vll == NULL)
+          {
+            SET_ERROR ("member in dict not found");
+          }
+
+        r = vll;
       }
       break;
 

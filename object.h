@@ -4,6 +4,7 @@
 #include "array.h"
 #include "cl.h"
 #include "const.h"
+#include "dict.h"
 #include "fun.h"
 #include "header.h"
 #include "iter.h"
@@ -26,6 +27,7 @@ enum ObjectType
   OBJ_MODHF = 8,    /* function in a module */
   OBJ_MODHC = 9,    /* class in a module */
   OBJ_MODWRAP = 10, /* wrapped in a mod frame */
+  OBJ_DICT = 11,
 };
 
 typedef struct object_s
@@ -105,6 +107,12 @@ typedef struct object_s
 
     } o_mw;
 
+    struct
+    {
+      dict_t *v;
+
+    } o_dict;
+
   } v;
 
   struct
@@ -141,6 +149,9 @@ typedef struct object_s
 
 #define OBJ_IS_BOOL(X)                                                        \
   ((X)->type == OBJ_CONST && (X)->v.o_const.v.type == CONST_BOOL)
+
+#define OBJ_IS_ARRAY(X) ((X)->type == OBJ_ARRAY)
+#define OBJ_IS_DICT(X) ((X)->type == OBJ_DICT)
 
 #if defined(__cplusplus)
 extern "C"

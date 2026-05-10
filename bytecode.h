@@ -4,6 +4,7 @@
 #include "arith.h"
 #include "cl.h"
 #include "const.h"
+#include "dict.h"
 #include "expr.h"
 #include "header.h"
 #include "ht.h"
@@ -47,6 +48,7 @@ typedef enum OpcodeType
   OP_IMPORT = 27,
   OP_IMPORT_ALIAS = 28,
   OP_RANGE = 29,
+  OP_LOAD_DICT = 30,
 
 } opcode_t;
 
@@ -106,6 +108,7 @@ typedef struct _frame_s
 } frame_t;
 
 #define SF_FRAME_LOCALS_CAP (64)
+#define SF_VM_ERRLOG_SIZE (128)
 
 typedef struct
 {
@@ -158,9 +161,9 @@ typedef struct _vm_s
 
   } signals;
 
-  progdata_t *pg; /* program data */
-  std_t *std;     /* stack trace data */
-  char err[128];  /* err message */
+  progdata_t *pg;              /* program data */
+  std_t *std;                  /* stack trace data */
+  char err[SF_VM_ERRLOG_SIZE]; /* err message */
 
 } vm_t;
 

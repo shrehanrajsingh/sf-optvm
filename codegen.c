@@ -425,6 +425,24 @@ sf_vm_gen_b_fromexpr (vm_t *vm, expr_t e)
       }
       break;
 
+    case EXPR_DICT:
+      {
+        for (size_t i = 0; i < e.v.e_dict.l; i++)
+          {
+            sf_vm_gen_b_fromexpr (vm, *e.v.e_dict.keys[i]);
+            sf_vm_gen_b_fromexpr (vm, *e.v.e_dict.vals[i]);
+          }
+
+        add_inst (vm, (instr_t){ .op = OP_LOAD_DICT,
+                                 .a = e.v.e_dict.l,
+                                 .b = 0,
+                                 .meta = {
+                                     .line = e.line,
+                                     .offset = 0,
+                                 } });
+      }
+      break;
+
     case EXPR_SQUARE_ACCESS:
       {
         sf_vm_gen_b_fromexpr (vm, *e.v.e_sqr_access.parent);

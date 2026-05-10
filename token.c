@@ -356,6 +356,15 @@ sf_token_gen (TokenSM *smt)
   while (n->type != TOK_EOF)
     n = sf_token_next (smt);
 
+  int ln = 0;
+  for (int i = 0; i < smt->vl; i++)
+    {
+      if (smt->vals[i].type == TOK_NEWLINE)
+        ln++;
+
+      smt->vals[i].line = ln;
+    }
+
   SFFREE (__strbfr);
   __strbfr = NULL;
 }

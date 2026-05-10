@@ -22,6 +22,7 @@ enum TokenType
 typedef struct
 {
   int type;
+  int line;
 
   union
   {

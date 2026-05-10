@@ -195,7 +195,8 @@ sf_ast_gen (TokenSM *smt)
               l0:;
 
                 stmt_t st;
-                st.line = smt->line;
+                // st.line = smt->line;
+                st.line = tok.line;
                 st.type = STMT_VARDECL;
 
                 // here;
@@ -343,7 +344,7 @@ sf_ast_gen (TokenSM *smt)
                         && t.v.t_operator.value[0] == ')');
 
                 stmt_t st;
-                st.line = smt->line;
+                st.line = tok.line;
 
                 st.type = STMT_FUNCALL;
                 st.v.s_funcall.name = sf_expr_gen (smt_back, smtv);
@@ -420,7 +421,7 @@ sf_ast_gen (TokenSM *smt)
                   }
 
                 stmt_t st;
-                st.line = smt->line;
+                st.line = tok.line;
 
                 st.type = STMT_IFBLOCK;
                 st.v.s_ifblock.body = body_smt->vals;
@@ -569,7 +570,7 @@ sf_ast_gen (TokenSM *smt)
                   }
 
                 stmt_t st;
-                st.line = smt->line;
+                st.line = tok.line;
 
                 st.type = STMT_WHILE;
                 st.v.s_while.cond = cond;
@@ -698,7 +699,7 @@ sf_ast_gen (TokenSM *smt)
                   }
 
                 stmt_t st;
-                st.line = smt->line;
+                st.line = tok.line;
 
                 st.type = STMT_FOR;
                 st.v.s_for.bl = body_smt->vl;
@@ -809,7 +810,7 @@ sf_ast_gen (TokenSM *smt)
                   }
 
                 stmt_t st;
-                st.line = smt->line;
+                st.line = tok.line;
 
                 st.type = STMT_FUNDECL;
                 st.v.s_fundecl.argc = al;
@@ -833,7 +834,7 @@ sf_ast_gen (TokenSM *smt)
                   {
                     /* return none */
                     stmt_t st;
-                    st.line = smt->line;
+                    st.line = tok.line;
 
                     st.type = STMT_RETURN;
                     expr_t *re = SFMALLOC (sizeof (*re));
@@ -871,7 +872,7 @@ sf_ast_gen (TokenSM *smt)
                     expr_t *re = sf_expr_gen (x, y);
 
                     stmt_t st;
-                    st.line = smt->line;
+                    st.line = tok.line;
 
                     st.type = STMT_RETURN;
                     st.v.s_return.v = re;
@@ -920,7 +921,7 @@ sf_ast_gen (TokenSM *smt)
                   }
 
                 stmt_t st;
-                st.line = smt->line;
+                st.line = tok.line;
 
                 st.type = STMT_CLASSDECL;
                 st.v.s_classdecl.name = name;
@@ -948,7 +949,7 @@ sf_ast_gen (TokenSM *smt)
                 const char *alias = tok.v.t_identifier.value;
 
                 stmt_t st;
-                st.line = smt->line;
+                st.line = tok.line;
 
                 st.type = STMT_IMPORT;
                 st.v.s_import.alias = alias;
@@ -967,7 +968,7 @@ sf_ast_gen (TokenSM *smt)
     }
 
   stmt_t st;
-  st.line = smt->line;
+  st.line = tok.line;
 
   st.type = STMT_EOF;
 
@@ -1474,6 +1475,76 @@ sf_expr_gen (token_t *start, token_t *end)
                         = SFMALLOC (sizeof (*e.v.e_sqr_access.parent));
                     *e.v.e_sqr_access.parent = ep;
                   }
+              }
+            else if (*op == '{')
+              {
+                token_t *left = start;
+                int saw_colon = 0;
+                int gb = 0;
+                int _end = 0;
+
+                expr_t **keys = SFMALLOC (64 * sizeof (*keys));
+                expr_t **vals = SFMALLOC (64 * sizeof (*vals));
+                size_t l = 0;
+
+                while (start <= end)
+                  {
+                    token_t u = *start++;
+
+                    if (u.type == TOK_OPERATOR)
+                      {
+                        const char *op = u.v.t_operator.value;
+
+                        if (*op == '}' && !gb)
+                          {
+                            if (left == start - 1)
+                              {
+                                /* ...,} */
+                              }
+                            else
+                              {
+                                vals[l++] = sf_expr_gen (left, start - 1);
+                                left = start;
+                                continue;
+                              }
+
+                            _end = 1;
+                            break;
+                          }
+
+                        if (*op == ':' && !gb)
+                          {
+                            saw_colon = 1;
+                            keys[l] = sf_expr_gen (left, start - 1);
+                            left = start;
+                            continue;
+                          }
+
+                        if (*op == ',' && !gb)
+                          {
+                            saw_colon = 0;
+                            vals[l++] = sf_expr_gen (left, start - 1);
+                            left = start;
+                            continue;
+                          }
+
+                        if (strstr ("({[", op) != NULL)
+                          gb++;
+
+                        if (strstr (")}]", op) != NULL)
+                          gb--;
+                      }
+                  }
+
+                assert (!_end && "syntax error");
+
+                e.type = EXPR_DICT;
+                e.v.e_dict.keys = keys;
+                e.v.e_dict.vals = vals;
+                e.v.e_dict.l = l;
+                goto end;
+
+                // D (sf_expr_print (e));
               }
           }
           break;

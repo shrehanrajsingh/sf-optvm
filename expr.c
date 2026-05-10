@@ -115,6 +115,21 @@ sf_expr_print (expr_t e)
       }
       break;
 
+    case EXPR_DICT:
+      {
+        printf ("EXPR_DICT (%lu):", e.v.e_dict.l);
+
+        for (size_t i = 0; i < e.v.e_dict.l; i++)
+          {
+            printf ("\nkey: ");
+            sf_expr_print (*e.v.e_dict.keys[i]);
+
+            printf ("\nval: ");
+            sf_expr_print (*e.v.e_dict.vals[i]);
+          }
+      }
+      break;
+
     case EXPR_SQUARE_ACCESS:
       {
         printf ("EXPR_SQUARE_ACCESS:\nparent: ");

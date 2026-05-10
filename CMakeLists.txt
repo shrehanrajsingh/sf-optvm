@@ -30,5 +30,6 @@ add_library(sunflower
     mod.h mod.c
     sunflower.h sunflower.c
     progdata.h progdata.c
-    std.h std.c)
+    std.h std.c
+    dict.h dict.c)
 

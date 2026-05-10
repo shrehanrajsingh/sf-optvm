@@ -175,6 +175,12 @@ sf_obj_free (obj_t *o, vm_t *vm)
       SFFREE (a);
     }
 
+  if (o->type == OBJ_DICT)
+    {
+      sf_dict_free (o->v.o_dict.v, vm);
+      SFFREE (o->v.o_dict.v);
+    }
+
   if (o->type == OBJ_ITER)
     {
       DR (o->v.o_iter.v.o, vm);
@@ -431,6 +437,28 @@ sf_obj_print (obj_t o)
               fprintf (stdout, ", ");
             else
               putchar (']');
+          }
+      }
+      break;
+
+    case OBJ_DICT:
+      {
+        dict_t *d = o.v.o_dict.v;
+
+        putchar ('{');
+        for (size_t i = 0; i < d->len; i++)
+          {
+            assert (d->keys[i] != NULL);
+            assert (d->vals[i] != NULL);
+
+            sf_obj_print (*d->keys[i]);
+            printf (": ");
+            sf_obj_print (*d->vals[i]);
+
+            if (i != d->len - 1)
+              fprintf (stdout, ", ");
+            else
+              putchar ('}');
           }
       }
       break;

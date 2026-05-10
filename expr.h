@@ -17,6 +17,7 @@ enum ExprType
   EXPR_ARRAY = 7,
   EXPR_SQUARE_ACCESS = 8,
   EXPR_TO_STEP = 9,
+  EXPR_DICT = 10,
   EXPR_COUNT
 };
 
@@ -107,6 +108,14 @@ typedef struct __expr_s
       struct __expr_s *step;
 
     } e_to_step;
+
+    struct
+    {
+      struct __expr_s **keys;
+      struct __expr_s **vals;
+      size_t l;
+
+    } e_dict;
 
   } v;
 
