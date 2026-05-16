@@ -72,7 +72,15 @@ sf_vm_new ()
   for (int i = 0; i < v.globals_cap; i++)
     v.globals[i] = NULL;
 
+  v.syspc = 0;
+
   return v;
+}
+
+SF_API void
+sf_vm_addsyspath (vm_t *vm, char *s)
+{
+  vm->sys_paths[vm->syspc++] = s;
 }
 
 SF_API void
@@ -1204,12 +1212,39 @@ start:;
                 goto end3;
               }
 
-            FILE *f = fopen (path, "r");
-            // D (printf ("%s\n", path));
+            char fpth[128];
+
+            // FILE *f = fopen (path, "r");
+            // // D (printf ("%s\n", path));
+
+            // if (f == NULL)
+            //   {
+            //     SET_ERROR ("error reading file: %s", strerror (errno));
+            //   }
+
+            FILE *f = NULL;
+            size_t fi = 0;
+
+            do
+              {
+                if (fi >= vm->syspc)
+                  break;
+
+                strcpy (fpth, vm->sys_paths[fi++]);
+                strcat (fpth, path);
+
+                D (printf ("%s\n", fpth));
+
+                f = fopen (fpth, "r");
+
+                if (f != NULL)
+                  break;
+              }
+            while (f == NULL);
 
             if (f == NULL)
               {
-                SET_ERROR ("error reading file: %s", strerror (errno));
+                SET_ERROR ("cannot open file '%s'", path);
               }
 
             fseek (f, 0, SEEK_END);
@@ -2225,6 +2260,21 @@ _sf_call_fun (vm_t *vm, obj_t *name, obj_t **args, size_t argc)
           {
             DR (e_args[i], vm);
           }
+      }
+      break;
+
+    case OBJ_MODHF:
+      {
+        obj_t *f = name->v.o_modhf.f; /* function */
+        obj_t *v = name->v.o_modhf.v; /* mod container */
+
+        mod_t *m = v->v.o_mod.v;
+
+        sf_vm_addframe (vm, *v->v.o_mod.v->fr);
+
+        _sf_call_fun (vm, f, args, argc);
+
+        vm->fp--;
       }
       break;
 

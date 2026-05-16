@@ -19,7 +19,7 @@ sf_native_put (obj_t *v)
 SF_API obj_t *
 sf_native_write (obj_t **vals, size_t vl)
 {
-  for (size_t i = 0; i < vl; i++)
+  for (int i = vl - 1; i >= 0; i--)
     {
       obj_t *v = vals[i];
 
@@ -115,5 +115,25 @@ sf_natives_add_tovm (vm_t *vm)
     s->slot = SF_VM_SLOT_GLOBAL;
     sf_ht_insert (vm->hts[vm->htl - 1], "put", (void *)s);
     vm->globals[vm->meta.g_slot++] = put_o;
+  }
+
+  {
+    fun_t *f = sf_fun_new (FUN_NATIVE);
+    sf_fun_addarg (f, "a");
+    f->v.native.nf_type = NF_ARG_ANY;
+    f->v.native.v.f_anyarg = sf_native_write;
+    f->v.native.scc = (int)'w';
+
+    obj_t *write_o = sf_objstore_req ();
+    write_o->type = OBJ_FUNC;
+    write_o->v.o_fun.v = f;
+
+    IR (write_o);
+
+    vval_t *s = SFMALLOC (sizeof (*s));
+    s->pos = vm->meta.g_slot;
+    s->slot = SF_VM_SLOT_GLOBAL;
+    sf_ht_insert (vm->hts[vm->htl - 1], "write", (void *)s);
+    vm->globals[vm->meta.g_slot++] = write_o;
   }
 }

@@ -2,3 +2,9 @@ a = 10
 
 fun test ()
     return 1 to a step 2
+
+fun fact (n)
+    if n == 1
+        return n
+    
+    return n * fact (n - 1)

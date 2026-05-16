@@ -88,8 +88,8 @@ typedef struct object_s
 
     struct
     {
-      struct object_s *f;
-      struct object_s *v;
+      struct object_s *f; /* function */
+      struct object_s *v; /* module container */
 
     } o_modhf;
 

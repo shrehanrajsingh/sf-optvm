@@ -193,6 +193,16 @@ sf_vm_gen_b_fromexpr (vm_t *vm, expr_t e)
         int lev = 0;
         vval_t *v = get_var (vm, e.v.e_var.v, &lev);
 
+        // for (int i = 0; i < vm->htl; i++)
+        //   {
+        //     for (int j = 0; j < vm->hts[i]->fast.c; j++)
+        //       {
+        //         D (printf ("%s, ", vm->hts[i]->fast.keys[j]))
+        //       }
+        //   }
+
+        // D (printf ("-------"));
+
         if (v == NULL)
           {
             printf ("undefined variable: %s\n", e.v.e_var.v);
@@ -773,10 +783,10 @@ sf_vm_gen_bytecode (vm_t *vm, StmtSM *smt)
 
             vval_t *nl = NULL;
 
-            if (vm->meta.slot == SF_VM_SLOT_NAME)
-              ;
-            else
-              nl = add_var (vm, name);
+            // if (vm->meta.slot == SF_VM_SLOT_NAME)
+            //   ;
+            // else
+            nl = add_var (vm, name);
 
             PRESERVE (vm);
 

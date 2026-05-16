@@ -1,5 +1,8 @@
 #include <sunflower.h>
 
+static int _argc;
+static char **_argv;
+
 static inline double
 now_sec (void)
 {
@@ -49,6 +52,12 @@ test3 ()
     sf_stmt_print (stt->vals[i]);
   here;
   vm_t vm = sf_vm_new ();
+
+#ifdef _WIN32
+  sf_vm_addsyspath (&vm, "..\\..\\test\\");
+#else
+  sf_vm_addsyspath (&vm, "../../test/");
+#endif
 
   size_t n_lines = 0;
   for (int i = 0; i < pos; i++)
@@ -122,6 +131,11 @@ test3 ()
 int
 main (int argc, char const *argv[])
 {
+  _argc = argc;
+  _argv = (char **)argv;
+
+  // D (printf ("%s\n", argv[0]));
+
   sf_objstore_init ();
   test3 ();
   return 0;

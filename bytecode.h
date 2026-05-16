@@ -165,6 +165,9 @@ typedef struct _vm_s
   std_t *std;                  /* stack trace data */
   char err[SF_VM_ERRLOG_SIZE]; /* err message */
 
+  char *sys_paths[32]; /* paths to check for imports */
+  size_t syspc;
+
 } vm_t;
 
 #define SF_VM_GLOBALS_CAP (512)
@@ -198,6 +201,7 @@ extern "C"
   SF_API obj_t *sqr_access (obj_t *, obj_t *, vm_t *);
   SF_API void sqr_set (obj_t *, obj_t *, obj_t *, vm_t *);
   SF_API void sf_vm_seterr (vm_t *, const char *, ...);
+  SF_API void sf_vm_addsyspath (vm_t *, char *);
 
 #if defined(__cplusplus)
 }

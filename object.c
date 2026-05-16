@@ -609,7 +609,25 @@ sf_obj_eqeq (obj_t *o, obj_t *p)
       return p->v.o_fun.v == o->v.o_fun.v;
       break;
 
+    case OBJ_ARRAY:
+      {
+        array_t *oa = o->v.o_array.v;
+        array_t *pa = p->v.o_array.v;
+
+        if (oa->len != pa->len)
+          return 0;
+
+        for (size_t i = 0; i < oa->len; i++)
+          if (!sf_obj_eqeq (oa->vals[i], pa->vals[i]))
+            return 0;
+
+        return 1;
+      }
+      break;
+
     default:
+      D (printf ("obj_eqeq not implemented for object type %d and %d", o->type,
+                 p->type));
       break;
     }
 

@@ -1,7 +1,4 @@
-a = {
-    1: 'one',
-    2: 'two',
-    [3, 4]: [5, 6]
-}
+import 'mod2.sf' as m2
 
-putln (a[3])
+putln (m2.test ())
+write (m2.fact (11), 12, 13)
