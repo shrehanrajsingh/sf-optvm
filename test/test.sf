@@ -1,3 +1,10 @@
 import 'json' as j
 
-putln (j.from ('{"a": 10, "b": 20}'))
+d = j.from ('{
+        "a": 10, 
+        "b": 20, 
+        "c": true,
+        "d": [1, 2, {"a": 20}]
+    }')
+
+putln (d['d'][2]['a'])
