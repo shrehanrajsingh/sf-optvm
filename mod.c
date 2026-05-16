@@ -10,6 +10,8 @@ sf_mod_new ()
   m->name = NULL;
   m->slots = NULL;
   m->vals = NULL;
+  m->is_native = 0;
+  m->fr = NULL;
 
   return m;
 }

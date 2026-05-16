@@ -107,6 +107,20 @@ test3 ()
 
   fclose (f);
 
+  /* native mods have negative keys */
+  {
+    obj_t *o_ljson = sf_objstore_req ();
+    o_ljson->type = OBJ_MOD;
+    o_ljson->v.o_mod.v = sf_lib_json_makemod ();
+
+    IR (o_ljson);
+    sf_modstore_add (vm.mod_store, -1, o_ljson);
+
+    vm.nativelib_s[0].code = -1;
+    vm.nativelib_s[0].o = o_ljson;
+    vm.nativelib_s[0].name = "json";
+  }
+
   do
     {
       sf_vm_exec_frame_top (&vm);

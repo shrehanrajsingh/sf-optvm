@@ -18,4 +18,6 @@
 #include "stmt.h"
 #include "token.h"
 
+#include "sflib/sflib.h"
+
 #endif // SUNFLOWER_H

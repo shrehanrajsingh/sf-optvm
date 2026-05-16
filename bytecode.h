@@ -109,6 +109,7 @@ typedef struct _frame_s
 
 #define SF_FRAME_LOCALS_CAP (64)
 #define SF_VM_ERRLOG_SIZE (128)
+#define SF_NATIVELIB_COUNT (4)
 
 typedef struct
 {
@@ -167,6 +168,14 @@ typedef struct _vm_s
 
   char *sys_paths[32]; /* paths to check for imports */
   size_t syspc;
+
+  struct
+  {
+    int code;
+    const char *name;
+    obj_t *o;
+
+  } nativelib_s[SF_NATIVELIB_COUNT];
 
 } vm_t;
 

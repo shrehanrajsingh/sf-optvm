@@ -74,6 +74,13 @@ sf_vm_new ()
 
   v.syspc = 0;
 
+  for (int i = 0; i < SF_NATIVELIB_COUNT; i++)
+    {
+      v.nativelib_s[i].code = 0;
+      v.nativelib_s[i].name = NULL;
+      v.nativelib_s[i].o = NULL;
+    }
+
   return v;
 }
 
@@ -230,6 +237,15 @@ pop (vm_t *vm)
     }
 
   return vm->stack[--vm->sp];
+}
+
+static inline void
+sf_vm_popframe_shallow (vm_t *vm)
+{
+  frame_t *fr = vm->frames[vm->fp - 1];
+  SFFREE (fr);
+  vm->frames[vm->fp - 1] = NULL;
+  --vm->fp;
 }
 
 SF_API void
@@ -559,8 +575,6 @@ start:;
                 // IR (args[al++]);
               }
 
-            IR (name);
-
             _sf_call_fun (vm, name, args, al); /* handles DR (name, vm); */
 
             if (!vm->signals.continue_exec)
@@ -574,7 +588,7 @@ start:;
 
             if (saw_modwrap)
               {
-                vm->fp--;
+                sf_vm_popframe_shallow (vm);
                 DR (ppres, vm);
               }
           }
@@ -1242,281 +1256,308 @@ start:;
               }
             while (f == NULL);
 
+            int is_nativemod = 0;
+            size_t _nmod_idx = 0;
+
             if (f == NULL)
               {
-                SET_ERROR ("cannot open file '%s'", path);
+                for (size_t i = 0; i < SF_NATIVELIB_COUNT; i++)
+                  {
+                    if (vm->nativelib_s[i].name != NULL
+                        && !strcmp (vm->nativelib_s[i].name, path))
+                      {
+                        is_nativemod = 1;
+                        _nmod_idx = i;
+                        break;
+                      }
+                  }
+
+                if (!is_nativemod)
+                  SET_ERROR ("cannot open file '%s'", path);
               }
 
-            fseek (f, 0, SEEK_END);
-            long pos = ftell (f);
-
-            // D (printf ("file size: %zu\n", pos));
-            fseek (f, 0, SEEK_SET);
-
-            char *buf = SFMALLOC ((pos + 2) * sizeof (char));
-            fread (buf, sizeof (char), pos, f);
-
-            buf[pos++] = '\n';
-            buf[pos] = '\0';
-
-            fclose (f);
-
-            TokenSM *smt = sf_statem_token_new (buf);
-            // printf ("%s\n", smt->raw);
-            sf_token_gen (smt);
-            token_t *vp = smt->vals;
-
-            // for (int i = 0; i < smt->vl; i++)
-            //   {
-            //     sf_token_print (smt->vals[i]);
-            //   }
-
-            // frame_t *frms = vm->frames;
-            // size_t frc = vm->frame_cap;
-            // size_t vmfp = vm->fp;
-
-            // obj_t **gp = vm->globals;
-            // hashtable_t **hts = vm->hts;
-            // size_t htl = vm->htl;
-
-            // vm->globals = SFMALLOC (vm->globals_cap * sizeof
-            // (*vm->globals));
-
-            // for (size_t i = 0; i < vm->globals_cap; i++)
-            //   vm->globals[i] = NULL;
-
-            // vm->htl = 1;
-            // vm->hts = SFMALLOC (vm->htc * sizeof (*vm->hts));
-            // vm->hts[0] = sf_ht_new ();
-
-            // for (size_t i = vm->htl; i < vm->htc; i++)
-            //   vm->hts[i] = NULL;
-
-            // vm->frames = SFMALLOC (vm->frame_cap * sizeof (*vm->frames));
-            // vm->fp = 0;
-
-            // sf_natives_add_tovm (vm);
-
-            StmtSM *stt = sf_ast_gen (smt);
-            stmt_t *stt_vals = stt->vals;
-
-            // approach 0
-            if (0)
+            if (is_nativemod)
               {
-                // D (printf ("%lu\n", stt->vl));
-                // for (size_t i = 0; i < stt->vl; i++)
-                //   sf_stmt_print (stt->vals[i]);
+                push (vm, vm->nativelib_s[_nmod_idx].o);
+                IR (vm->nativelib_s[_nmod_idx].o);
 
-                // vm_t mm = sf_vm_new ();
-                // mm.meta.slot = SF_VM_SLOT_NAME;
-                // sf_natives_add_tovm (&mm);
+                sf_modstore_add (vm->mod_store, vm->ip,
+                                 vm->nativelib_s[_nmod_idx].o);
+              }
+            else
+              {
+                fseek (f, 0, SEEK_END);
+                long pos = ftell (f);
 
-                // mm.fp = 1;
-                // sf_vm_gen_bytecode (&mm, stt);
-                // mm.fp = 0;
+                // D (printf ("file size: %zu\n", pos));
+                fseek (f, 0, SEEK_SET);
 
-                // // for (int i = 0; i < mm.inst_len; i++)
-                // //   sf_vm_print_inst (mm.insts[i]);
+                char *buf = SFMALLOC ((pos + 2) * sizeof (char));
+                fread (buf, sizeof (char), pos, f);
 
-                // frame_t top = sf_frame_new_name ();
-                // top.pop_ret_val = 0;
-                // top.return_ip = mm.inst_len - 1;
-                // top.stack_base = mm.sp;
+                buf[pos++] = '\n';
+                buf[pos] = '\0';
 
-                // sf_vm_addframe (&mm, top);
-                // sf_vm_exec_single_frame (&mm);
+                fclose (f);
 
-                // frame_t *bf = &mm.frames[mm.fp - 1];
+                TokenSM *smt = sf_statem_token_new (buf);
+                // printf ("%s\n", smt->raw);
+                sf_token_gen (smt);
+                token_t *vp = smt->vals;
 
-                // // // D (printf ("%lu\n", bf->n.nvl));
-                // // // for (int i = 0; i < bf->n.nvl; i++)
-                // // //   printf ("%s\n", bf->n.names[i]);
-
-                // mod_t *mod = sf_mod_new ();
-
-                // mod->name = SFSTRDUP (alias);
-                // mod->slots = SFMALLOC (bf->n.nvc * sizeof (*mod->slots));
-                // mod->vals = SFMALLOC (bf->n.nvc * sizeof (*mod->vals));
-
-                // for (int i = 0; i < bf->n.nvl; i++)
+                // for (int i = 0; i < smt->vl; i++)
                 //   {
-                //     mod->slots[i] = SFSTRDUP (bf->n.names[i]);
-                //     mod->vals[i] = bf->n.vals[i];
-                //     IR (mod->vals[i]);
+                //     sf_token_print (smt->vals[i]);
                 //   }
 
-                // mod->svc = bf->n.nvc;
-                // mod->svl = bf->n.nvl;
+                // frame_t *frms = vm->frames;
+                // size_t frc = vm->frame_cap;
+                // size_t vmfp = vm->fp;
 
-                // obj_t *o = sf_objstore_req ();
-                // o->type = OBJ_MOD;
-                // o->v.o_mod.v = mod;
+                // obj_t **gp = vm->globals;
+                // hashtable_t **hts = vm->hts;
+                // size_t htl = vm->htl;
 
-                // push (vm, o);
-                // IR (o);
+                // vm->globals = SFMALLOC (vm->globals_cap * sizeof
+                // (*vm->globals));
 
-                // sf_vm_framefree (bf, &mm);
+                // for (size_t i = 0; i < vm->globals_cap; i++)
+                //   vm->globals[i] = NULL;
 
-                // for (int i = 0; i < mm.globals_cap; i++)
-                //   {
-                //     if (mm.globals[i] != NULL)
-                //       {
-                //         DR (mm.globals[i], vm);
-                //       }
-                //   }
+                // vm->htl = 1;
+                // vm->hts = SFMALLOC (vm->htc * sizeof (*vm->hts));
+                // vm->hts[0] = sf_ht_new ();
 
-                // SFFREE (mm.globals);
+                // for (size_t i = vm->htl; i < vm->htc; i++)
+                //   vm->hts[i] = NULL;
 
-                // for (int i = 0; i < mm.htc; i++)
-                //   {
-                //     if (mm.hts[i] != NULL)
-                //       sf_ht_free (mm.hts[i]);
-                //   }
+                // vm->frames = SFMALLOC (vm->frame_cap * sizeof
+                // (*vm->frames)); vm->fp = 0;
 
-                // SFFREE (mm.hts);
-                // SFFREE (mm.insts);
-                // SFFREE (mm.map_consts);
-                // SFFREE (mm.stack);
-                // SFFREE (mm.frames);
+                // sf_natives_add_tovm (vm);
+
+                StmtSM *stt = sf_ast_gen (smt);
+                stmt_t *stt_vals = stt->vals;
+
+                // approach 0
+                if (0)
+                  {
+                    // D (printf ("%lu\n", stt->vl));
+                    // for (size_t i = 0; i < stt->vl; i++)
+                    //   sf_stmt_print (stt->vals[i]);
+
+                    // vm_t mm = sf_vm_new ();
+                    // mm.meta.slot = SF_VM_SLOT_NAME;
+                    // sf_natives_add_tovm (&mm);
+
+                    // mm.fp = 1;
+                    // sf_vm_gen_bytecode (&mm, stt);
+                    // mm.fp = 0;
+
+                    // // for (int i = 0; i < mm.inst_len; i++)
+                    // //   sf_vm_print_inst (mm.insts[i]);
+
+                    // frame_t top = sf_frame_new_name ();
+                    // top.pop_ret_val = 0;
+                    // top.return_ip = mm.inst_len - 1;
+                    // top.stack_base = mm.sp;
+
+                    // sf_vm_addframe (&mm, top);
+                    // sf_vm_exec_single_frame (&mm);
+
+                    // frame_t *bf = &mm.frames[mm.fp - 1];
+
+                    // // // D (printf ("%lu\n", bf->n.nvl));
+                    // // // for (int i = 0; i < bf->n.nvl; i++)
+                    // // //   printf ("%s\n", bf->n.names[i]);
+
+                    // mod_t *mod = sf_mod_new ();
+
+                    // mod->name = SFSTRDUP (alias);
+                    // mod->slots = SFMALLOC (bf->n.nvc * sizeof
+                    // (*mod->slots)); mod->vals = SFMALLOC (bf->n.nvc * sizeof
+                    // (*mod->vals));
+
+                    // for (int i = 0; i < bf->n.nvl; i++)
+                    //   {
+                    //     mod->slots[i] = SFSTRDUP (bf->n.names[i]);
+                    //     mod->vals[i] = bf->n.vals[i];
+                    //     IR (mod->vals[i]);
+                    //   }
+
+                    // mod->svc = bf->n.nvc;
+                    // mod->svl = bf->n.nvl;
+
+                    // obj_t *o = sf_objstore_req ();
+                    // o->type = OBJ_MOD;
+                    // o->v.o_mod.v = mod;
+
+                    // push (vm, o);
+                    // IR (o);
+
+                    // sf_vm_framefree (bf, &mm);
+
+                    // for (int i = 0; i < mm.globals_cap; i++)
+                    //   {
+                    //     if (mm.globals[i] != NULL)
+                    //       {
+                    //         DR (mm.globals[i], vm);
+                    //       }
+                    //   }
+
+                    // SFFREE (mm.globals);
+
+                    // for (int i = 0; i < mm.htc; i++)
+                    //   {
+                    //     if (mm.hts[i] != NULL)
+                    //       sf_ht_free (mm.hts[i]);
+                    //   }
+
+                    // SFFREE (mm.hts);
+                    // SFFREE (mm.insts);
+                    // SFFREE (mm.map_consts);
+                    // SFFREE (mm.stack);
+                    // SFFREE (mm.frames);
+                  }
+
+                // approach 1
+                size_t ip = vm->inst_len;
+
+                PRESERVE (vm);
+                vm->meta.slot = SF_VM_SLOT_NAME;
+
+                hashtable_t **hts = vm->hts;
+                size_t htsp = vm->htl;
+
+                vm->hts = SFMALLOC (vm->htc * sizeof (*vm->hts));
+                vm->htl = 0;
+
+                for (size_t i = 0; i < vm->htc; i++)
+                  vm->hts[i] = NULL;
+
+                vm->hts[vm->htl++] = hts[0];
+                vm->hts[vm->htl++] = sf_ht_new ();
+
+                /**
+                 * this adds bytecode to the end
+                 * of current generated bytecode
+                 * so control has
+                 * [main program bytes]...[module bytes]
+                 */
+                sf_vm_gen_bytecode (vm, stt);
+
+                // sf_vm_print_b (vm);
+
+                for (size_t i = 1; i < vm->htc; i++)
+                  if (vm->hts[i] != NULL)
+                    sf_ht_free (vm->hts[i]);
+
+                SFFREE (vm->hts);
+
+                vm->hts = hts;
+                vm->htl = htsp;
+
+                // for (size_t i = ip; i < vm->inst_len; i++)
+                //   sf_vm_print_inst (vm->insts[i]);
+
+                RESTORE (vm);
+
+                frame_t fr = sf_frame_new_name ();
+                fr.is_mod = 1;
+                fr.pop_ret_val = 1;
+                fr.return_ip = vm->ip;
+                fr.stack_base = vm->sp;
+
+                // D (printf ("%d\n", ip));
+                vm->ip = ip;
+
+                // frame_t *fpres = vm->frames;
+                // size_t fpc = vm->fp;
+
+                // vm->frames = SFMALLOC (vm->frame_cap * sizeof
+                // (*vm->frames)); vm->fp = 0;
+
+                sf_vm_addframe (vm, fr);
+                frame_t *bf = vm->frames[vm->fp - 1];
+
+                sf_vm_exec_single_frame (vm);
+
+                // D (printf ("%d\n", vm->ip));
+
+                // SFFREE (vm->frames);
+                // vm->frames = fpres;
+                // vm->fp = fpc;
+
+                // // D (printf ("%lu\n", bf->n.nvl));
+                // // for (int i = 0; i < bf->n.nvl; i++)
+                // //   printf ("%s\n", bf->n.names[i]);
+
+                mod_t *mod = sf_mod_new ();
+
+                mod->name = SFSTRDUP (alias);
+                mod->slots = SFMALLOC (bf->n.nvc * sizeof (*mod->slots));
+                mod->vals = SFMALLOC (bf->n.nvc * sizeof (*mod->vals));
+
+                for (int i = 0; i < bf->n.nvl; i++)
+                  {
+                    if (bf->n.names[i] == NULL)
+                      continue;
+
+                    mod->slots[i] = SFSTRDUP (bf->n.names[i]);
+                    mod->vals[i] = bf->n.vals[i];
+                    IR (mod->vals[i]);
+                  }
+
+                mod->svc = bf->n.nvc;
+                mod->svl = bf->n.nvl;
+
+                obj_t *o = sf_objstore_req ();
+                o->type = OBJ_MOD;
+                o->v.o_mod.v = mod;
+
+                push (vm, o);
+                IR (o);
+
+                IR (o);
+                sf_modstore_add (vm->mod_store, vm->ip, o);
+
+                /**
+                 * hide the frame and save it
+                 * from deletion
+                 */
+                vm->fp--;
+
+                /* the frame (which will not be freed)
+                  is allocated to mod */
+                mod->fr = bf;
+
+                // for (size_t i = 0; i < mod->fr->n.nvl; i++)
+                //   D (printf ("%s\n", mod->fr->n.names[i]));
+
+                // vm->frames = frms;
+                // vm->frame_cap = frc;
+                // vm->fp = vmfp;
+                // vm->globals = gp;
+                // vm->hts = hts;
+                // vm->htl = htl;
+
+                SFFREE (buf);
+
+                for (size_t i = 0; i < stt->vl; i++)
+                  sf_stmt_free (&stt_vals[i]);
+
+                SFFREE (stt_vals);
+                SFFREE (stt);
+
+                for (size_t i = 0; i < smt->vc; i++)
+                  {
+                    if (vp[i].type != -1)
+                      sf_token_free (&vp[i]);
+                  }
+
+                SFFREE (vp);
+                SFFREE (smt);
               }
-
-            // approach 1
-            size_t ip = vm->inst_len;
-
-            PRESERVE (vm);
-            vm->meta.slot = SF_VM_SLOT_NAME;
-
-            hashtable_t **hts = vm->hts;
-            size_t htsp = vm->htl;
-
-            vm->hts = SFMALLOC (vm->htc * sizeof (*vm->hts));
-            vm->htl = 0;
-
-            for (size_t i = 0; i < vm->htc; i++)
-              vm->hts[i] = NULL;
-
-            vm->hts[vm->htl++] = hts[0];
-            vm->hts[vm->htl++] = sf_ht_new ();
-
-            /**
-             * this adds bytecode to the end
-             * of current generated bytecode
-             * so control has
-             * [main program bytes]...[module bytes]
-             */
-            sf_vm_gen_bytecode (vm, stt);
-
-            // sf_vm_print_b (vm);
-
-            for (size_t i = 1; i < vm->htc; i++)
-              if (vm->hts[i] != NULL)
-                sf_ht_free (vm->hts[i]);
-
-            SFFREE (vm->hts);
-
-            vm->hts = hts;
-            vm->htl = htsp;
-
-            // for (size_t i = ip; i < vm->inst_len; i++)
-            //   sf_vm_print_inst (vm->insts[i]);
-
-            RESTORE (vm);
-
-            frame_t fr = sf_frame_new_name ();
-            fr.is_mod = 1;
-            fr.pop_ret_val = 1;
-            fr.return_ip = vm->ip;
-            fr.stack_base = vm->sp;
-
-            // D (printf ("%d\n", ip));
-            vm->ip = ip;
-
-            // frame_t *fpres = vm->frames;
-            // size_t fpc = vm->fp;
-
-            // vm->frames = SFMALLOC (vm->frame_cap * sizeof (*vm->frames));
-            // vm->fp = 0;
-
-            sf_vm_addframe (vm, fr);
-            frame_t *bf = vm->frames[vm->fp - 1];
-
-            sf_vm_exec_single_frame (vm);
-
-            // D (printf ("%d\n", vm->ip));
-
-            // SFFREE (vm->frames);
-            // vm->frames = fpres;
-            // vm->fp = fpc;
-
-            // // D (printf ("%lu\n", bf->n.nvl));
-            // // for (int i = 0; i < bf->n.nvl; i++)
-            // //   printf ("%s\n", bf->n.names[i]);
-
-            mod_t *mod = sf_mod_new ();
-
-            mod->name = SFSTRDUP (alias);
-            mod->slots = SFMALLOC (bf->n.nvc * sizeof (*mod->slots));
-            mod->vals = SFMALLOC (bf->n.nvc * sizeof (*mod->vals));
-
-            for (int i = 0; i < bf->n.nvl; i++)
-              {
-                if (bf->n.names[i] == NULL)
-                  continue;
-
-                mod->slots[i] = SFSTRDUP (bf->n.names[i]);
-                mod->vals[i] = bf->n.vals[i];
-                IR (mod->vals[i]);
-              }
-
-            mod->svc = bf->n.nvc;
-            mod->svl = bf->n.nvl;
-
-            obj_t *o = sf_objstore_req ();
-            o->type = OBJ_MOD;
-            o->v.o_mod.v = mod;
-
-            push (vm, o);
-            IR (o);
-
-            IR (o);
-            sf_modstore_add (vm->mod_store, vm->ip, o);
-
-            /**
-             * hide the frame and save it
-             * from deletion
-             */
-            vm->fp--;
-
-            /* the frame (which will not be freed)
-              is allocated to mod */
-            mod->fr = bf;
-
-            // for (size_t i = 0; i < mod->fr->n.nvl; i++)
-            //   D (printf ("%s\n", mod->fr->n.names[i]));
-
-            // vm->frames = frms;
-            // vm->frame_cap = frc;
-            // vm->fp = vmfp;
-            // vm->globals = gp;
-            // vm->hts = hts;
-            // vm->htl = htl;
-
-            SFFREE (buf);
-
-            for (size_t i = 0; i < stt->vl; i++)
-              sf_stmt_free (&stt_vals[i]);
-
-            SFFREE (stt_vals);
-            SFFREE (stt);
-
-            for (size_t i = 0; i < smt->vc; i++)
-              {
-                if (vp[i].type != -1)
-                  sf_token_free (&vp[i]);
-              }
-
-            SFFREE (vp);
-            SFFREE (smt);
           }
           break;
 
@@ -1723,17 +1764,17 @@ sf_vm_popframe (vm_t *vm)
   //   if (f->locals[i] != NULL)
   //     DR (f->locals[i], vm);
 
-  // frame_t *fr = vm->frames[vm->fp - 1];
-  // sf_vm_framefree (fr, vm);
-  // SFFREE (fr);
-  // vm->frames[vm->fp - 1] = NULL;
+  frame_t *fr = vm->frames[vm->fp - 1];
+  sf_vm_framefree (fr, vm);
+  SFFREE (fr);
+  vm->frames[vm->fp - 1] = NULL;
   --vm->fp;
 }
 
 SF_API void
 sf_vm_framefree (frame_t *f, vm_t *vm)
 {
-  return;
+  // return;
   // D (printf ("%p", f));
   // D (printf ("%lu\n", f->locals_count));
 
@@ -1741,22 +1782,24 @@ sf_vm_framefree (frame_t *f, vm_t *vm)
     {
     case FRAME_LOCAL:
       {
-        here;
-        // if (f->l.locals != NULL)
-        for (int i = 0; i < f->l.locals_cap; i++)
+        // here;
+        if (f->l.locals != NULL)
           {
-            if (f->l.locals[i] != NULL)
+            for (int i = 0; i < f->l.locals_cap; i++)
               {
-                // sf_obj_print (*f->l.locals[i]);
-                DR (f->l.locals[i], vm);
+                if (f->l.locals[i] != NULL)
+                  {
+                    DR (f->l.locals[i], vm);
+                  }
               }
+
+            SFFREE (f->l.locals);
           }
 
         // here;
 
         // if (f->l.locals != NULL)
         {
-          SFFREE (f->l.locals);
           // f->l.locals = NULL;
           // f->l.locals_count = 0;
           // f->l.locals_cap = 0;
@@ -1791,8 +1834,41 @@ sf_vm_framefree (frame_t *f, vm_t *vm)
 obj_t *
 container_access (obj_t *o, char *name)
 {
+  // D (printf ("%s\n", name));
+  // D (sf_obj_print (*o));
+  // D (printf ("%d\n", o->type));
+
   switch (o->type)
     {
+    case OBJ_MODHC:
+      {
+        obj_t *f = o->v.o_modcf.f;
+        obj_t *v = o->v.o_modcf.v;
+
+        /* search f (class) */
+        assert (f->type == OBJ_CLASS);
+        class_t *c = f->v.o_class.v;
+
+        {
+          for (int i = 0; i < c->svl; i++)
+            {
+              D (printf ("%s %s\n", c->slots[i], name));
+              if (c->slots[i] != NULL && !strcmp (c->slots[i], name))
+                return c->vals[i];
+            }
+        }
+
+        /* search v (mod) */
+        mod_t *m = v->v.o_mod.v;
+
+        for (size_t i = 0; i < m->svl; i++)
+          {
+            if (!strcmp (m->slots[i], name))
+              return c->vals[i];
+          }
+      }
+      break;
+
     case OBJ_CLASS:
       {
         class_t *c = o->v.o_class.v;
@@ -1800,8 +1876,11 @@ container_access (obj_t *o, char *name)
         // if (c->par_fr == NULL)
         {
           for (int i = 0; i < c->svl; i++)
-            if (c->slots[i] != NULL && !strcmp (c->slots[i], name))
-              return c->vals[i];
+            {
+              // D (printf ("%s %s\n", c->slots[i], name));
+              if (c->slots[i] != NULL && !strcmp (c->slots[i], name))
+                return c->vals[i];
+            }
         }
         // else
         //   {
@@ -1852,6 +1931,8 @@ container_access (obj_t *o, char *name)
               }
           }
 
+        // if (r != NULL)
+        //   sf_obj_print (*r);
         if (r != NULL && r->type == OBJ_FUNC)
           {
             obj_t *oj = sf_objstore_req ();
@@ -2063,6 +2144,13 @@ sqr_set (obj_t *p, obj_t *i, obj_t *val, vm_t *vm)
       }
       break;
 
+    case OBJ_DICT:
+      {
+        dict_t *d = p->v.o_dict.v;
+        sf_dict_add (d, i, val, vm);
+      }
+      break;
+
     default:
       break;
     }
@@ -2191,7 +2279,7 @@ _sf_call_fun (vm_t *vm, obj_t *name, obj_t **args, size_t argc)
         if (remove_pf)
           {
             /* soft remove */
-            --vm->fp;
+            sf_vm_popframe_shallow (vm);
           }
       }
       break;
@@ -2215,11 +2303,15 @@ _sf_call_fun (vm_t *vm, obj_t *name, obj_t **args, size_t argc)
         // push (vm, o);
         // IR (o);
 
-        args[argc++] = o;
-        IR (o);
+        int return_obj = inst.b == 1;
+        int self_retained = 0;
 
         if (_init_method != NULL)
           {
+            args[argc++] = o;
+            IR (o);
+            self_retained = 1;
+
             size_t init_sp = vm->sp;
             IR (_init_method);
             _sf_call_fun (vm, _init_method, args, argc);
@@ -2231,8 +2323,16 @@ _sf_call_fun (vm_t *vm, obj_t *name, obj_t **args, size_t argc)
               }
           }
 
-        push (vm, o);
-        IR (o);
+        if (return_obj)
+          {
+            push (vm, o);
+            IR (o);
+          }
+
+        if (self_retained || !return_obj)
+          {
+            DR (o, vm);
+          }
       }
       break;
 
@@ -2272,9 +2372,67 @@ _sf_call_fun (vm_t *vm, obj_t *name, obj_t **args, size_t argc)
 
         sf_vm_addframe (vm, *v->v.o_mod.v->fr);
 
+        IR (f);
         _sf_call_fun (vm, f, args, argc);
 
-        vm->fp--;
+        sf_vm_popframe_shallow (vm);
+      }
+      break;
+
+    case OBJ_MODHC:
+      {
+        // D (printf ("%d\n", name->meta.ref_count));
+        sf_vm_addframe (vm, *name->v.o_modcf.v->v.o_mod.v->fr);
+
+        class_t *c = name->v.o_modcf.f->v.o_class.v;
+        cobj_t *co = sf_cobj_new (c);
+
+        obj_t *o = sf_objstore_req ();
+        o->type = OBJ_COBJ;
+        o->v.o_cobj.v = co;
+
+        obj_t *_init_method = container_access (name->v.o_modcf.f, "_init");
+
+        // if (_init_method != NULL && _init_method->type == OBJ_MODHC)
+        //   {
+        //     sf_obj_print (*_init_method->v.o_modcf.f);
+        //     sf_obj_print (*_init_method->v.o_modcf.v);
+        //   }
+
+        // D (printf ("%d\n", o->meta.ref_count));
+
+        int return_obj = inst.b == 1;
+        int self_retained = 0;
+
+        if (_init_method != NULL)
+          {
+            args[argc++] = o;
+            IR (o);
+            self_retained = 1;
+
+            size_t init_sp = vm->sp;
+            IR (_init_method);
+            _sf_call_fun (vm, _init_method, args, argc);
+
+            while (vm->sp > init_sp)
+              {
+                obj_t *tmp = pop (vm);
+                DR (tmp, vm);
+              }
+          }
+
+        if (return_obj)
+          {
+            push (vm, o);
+            IR (o);
+          }
+
+        if (self_retained || !return_obj)
+          {
+            DR (o, vm);
+          }
+
+        sf_vm_popframe_shallow (vm);
       }
       break;
 

@@ -56,9 +56,13 @@ sf_dict_add (dict_t *d, obj_t *k, obj_t *v, vm_t *vm)
         }
     }
 
-  if (saw_idx)
+  /* no IR (k) and IR (v) */
+
+  if (saw)
     {
-      DR (d->vals[saw], vm);
+      DR (d->vals[saw_idx], vm);
+      d->keys[saw_idx] = k;
+      d->vals[saw_idx] = v;
       return;
     }
 
@@ -66,7 +70,7 @@ sf_dict_add (dict_t *d, obj_t *k, obj_t *v, vm_t *vm)
   d->keys = SFREALLOC (d->keys, d->len * sizeof (*d->keys));
   d->vals = SFREALLOC (d->vals, d->len * sizeof (*d->vals));
 
-  d->keys[d->len - 1] = SFSTRDUP (k);
+  d->keys[d->len - 1] = k;
   d->vals[d->len - 1] = v;
 }
 

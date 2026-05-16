@@ -1,4 +1,3 @@
-import 'mod2.sf' as m2
+import 'json' as j
 
-putln (m2.test ())
-write (m2.fact (11), 12, 13)
+putln (j.from ('{"a": 10, "b": 20}'))

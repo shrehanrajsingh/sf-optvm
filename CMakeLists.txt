@@ -31,5 +31,8 @@ add_library(sunflower
     sunflower.h sunflower.c
     progdata.h progdata.c
     std.h std.c
-    dict.h dict.c)
+    dict.h dict.c
+    
+    sflib/sflib.h sflib/sflib.c
+    sflib/json.h sflib/json.c)
 

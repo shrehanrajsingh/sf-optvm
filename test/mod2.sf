@@ -8,3 +8,15 @@ fun fact (n)
         return n
     
     return n * fact (n - 1)
+
+class Data
+    val = 0
+
+    fun _init (self, v)
+        self.val = v
+
+    fun _kill (self)
+        putln ("kill")
+
+
+t = Data (200)

@@ -149,6 +149,7 @@ sf_obj_rc_dec (obj_t *o, vm_t *vm)
 SF_API void
 sf_obj_free (obj_t *o, vm_t *vm)
 {
+  // D (printf ("%d\n", o->type));
   o->meta.active = 0;
 
   if (o->type == OBJ_FUNC)

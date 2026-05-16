@@ -15,6 +15,8 @@ typedef struct __mod_s
   size_t svc;
   struct _frame_s *fr;
 
+  int is_native;
+
 } mod_t;
 
 typedef struct __modstore_s
