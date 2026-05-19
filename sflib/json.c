@@ -3,6 +3,8 @@
 #include "../mod.h"
 #include "../object.h"
 
+#include <math.h>
+
 typedef struct
 {
   obj_t **vals;
@@ -77,6 +79,91 @@ _sfjson_buf_push_utf8 (char **buf, size_t *len, size_t *cap, uint32_t cp)
                               (char)(0x80 | ((cp >> 12) & 0x3F)))
          && _sfjson_buf_push (buf, len, cap, (char)(0x80 | ((cp >> 6) & 0x3F)))
          && _sfjson_buf_push (buf, len, cap, (char)(0x80 | (cp & 0x3F)));
+}
+
+static int
+_sfjson_buf_push_str (char **buf, size_t *len, size_t *cap, const char *s)
+{
+  if (s == NULL)
+    return 0;
+
+  while (*s)
+    {
+      if (!_sfjson_buf_push (buf, len, cap, *s++))
+        return 0;
+    }
+
+  return 1;
+}
+
+static int
+_sfjson_buf_push_hex2 (char **buf, size_t *len, size_t *cap, unsigned char v)
+{
+  static const char *hex = "0123456789abcdef";
+  return _sfjson_buf_push (buf, len, cap, hex[v >> 4])
+         && _sfjson_buf_push (buf, len, cap, hex[v & 0x0F]);
+}
+
+static int
+_sfjson_write_string (const char *s, char **buf, size_t *len, size_t *cap)
+{
+  if (s == NULL)
+    return 0;
+
+  if (!_sfjson_buf_push (buf, len, cap, '"'))
+    return 0;
+
+  for (const unsigned char *p = (const unsigned char *)s; *p; p++)
+    {
+      unsigned char c = *p;
+      switch (c)
+        {
+        case '"':
+          if (!_sfjson_buf_push_str (buf, len, cap, "\\\""))
+            return 0;
+          break;
+        case '\\':
+          if (!_sfjson_buf_push_str (buf, len, cap, "\\\\"))
+            return 0;
+          break;
+        case '\b':
+          if (!_sfjson_buf_push_str (buf, len, cap, "\\b"))
+            return 0;
+          break;
+        case '\f':
+          if (!_sfjson_buf_push_str (buf, len, cap, "\\f"))
+            return 0;
+          break;
+        case '\n':
+          if (!_sfjson_buf_push_str (buf, len, cap, "\\n"))
+            return 0;
+          break;
+        case '\r':
+          if (!_sfjson_buf_push_str (buf, len, cap, "\\r"))
+            return 0;
+          break;
+        case '\t':
+          if (!_sfjson_buf_push_str (buf, len, cap, "\\t"))
+            return 0;
+          break;
+        default:
+          if (c < 0x20)
+            {
+              if (!_sfjson_buf_push_str (buf, len, cap, "\\u00"))
+                return 0;
+              if (!_sfjson_buf_push_hex2 (buf, len, cap, c))
+                return 0;
+            }
+          else
+            {
+              if (!_sfjson_buf_push (buf, len, cap, (char)c))
+                return 0;
+            }
+          break;
+        }
+    }
+
+  return _sfjson_buf_push (buf, len, cap, '"');
 }
 
 static char *
@@ -263,6 +350,122 @@ _sfjson_make_string (char *s)
   o->v.o_const.v.type = CONST_STRING;
   o->v.o_const.v.v.c_str.v = s;
   return o;
+}
+
+static int _sfjson_write_value (obj_t *o, char **buf, size_t *len,
+                                size_t *cap);
+
+static int
+_sfjson_write_array (array_t *a, char **buf, size_t *len, size_t *cap)
+{
+  if (a == NULL)
+    return 0;
+
+  if (!_sfjson_buf_push (buf, len, cap, '['))
+    return 0;
+
+  if (a->len && a->vals == NULL)
+    return 0;
+
+  for (size_t i = 0; i < a->len; i++)
+    {
+      if (i && !_sfjson_buf_push (buf, len, cap, ','))
+        return 0;
+      if (!_sfjson_write_value (a->vals[i], buf, len, cap))
+        return 0;
+    }
+
+  return _sfjson_buf_push (buf, len, cap, ']');
+}
+
+static int
+_sfjson_write_object (dict_t *d, char **buf, size_t *len, size_t *cap)
+{
+  if (d == NULL)
+    return 0;
+
+  if (!_sfjson_buf_push (buf, len, cap, '{'))
+    return 0;
+
+  if (d->len && (d->keys == NULL || d->vals == NULL))
+    return 0;
+
+  for (size_t i = 0; i < d->len; i++)
+    {
+      obj_t *k = d->keys[i];
+      obj_t *v = d->vals[i];
+
+      if (k == NULL || !OBJ_IS_STRING (k))
+        return 0;
+
+      if (i && !_sfjson_buf_push (buf, len, cap, ','))
+        return 0;
+      if (!_sfjson_write_string (k->v.o_const.v.v.c_str.v, buf, len, cap))
+        return 0;
+      if (!_sfjson_buf_push (buf, len, cap, ':'))
+        return 0;
+      if (!_sfjson_write_value (v, buf, len, cap))
+        return 0;
+    }
+
+  return _sfjson_buf_push (buf, len, cap, '}');
+}
+
+static int
+_sfjson_write_value (obj_t *o, char **buf, size_t *len, size_t *cap)
+{
+  if (o == NULL)
+    return 0;
+
+  switch (o->type)
+    {
+    case OBJ_CONST:
+      switch (o->v.o_const.v.type)
+        {
+        case CONST_INT:
+          {
+            char tmp[32];
+            int n
+                = snprintf (tmp, sizeof (tmp), "%d", o->v.o_const.v.v.c_int.v);
+            if (n <= 0 || (size_t)n >= sizeof (tmp))
+              return 0;
+            return _sfjson_buf_push_str (buf, len, cap, tmp);
+          }
+        case CONST_FLOAT:
+          {
+            double dv = (double)o->v.o_const.v.v.c_float.v;
+            if (!isfinite (dv))
+              return 0;
+            char tmp[64];
+            int n = snprintf (tmp, sizeof (tmp), "%.9g", dv);
+            if (n <= 0 || (size_t)n >= sizeof (tmp))
+              return 0;
+            return _sfjson_buf_push_str (buf, len, cap, tmp);
+          }
+        case CONST_STRING:
+          return _sfjson_write_string (o->v.o_const.v.v.c_str.v, buf, len,
+                                       cap);
+        case CONST_BOOL:
+          return _sfjson_buf_push_str (
+              buf, len, cap, o->v.o_const.v.v.c_bool.v ? "true" : "false");
+        case CONST_NONE:
+          return _sfjson_buf_push_str (buf, len, cap, "null");
+        default:
+          return 0;
+        }
+      break;
+
+    case OBJ_ARRAY:
+      return _sfjson_write_array (o->v.o_array.v, buf, len, cap);
+
+    case OBJ_DICT:
+      return _sfjson_write_object (o->v.o_dict.v, buf, len, cap);
+
+    default:
+      return 0;
+    }
+
+  return 0;
 }
 
 static int
@@ -567,6 +770,29 @@ _sfjson_from (obj_t *ss)
   return out;
 }
 
+static obj_t *
+_sfjson_to (obj_t *dd)
+{
+  assert (OBJ_IS_DICT (dd) && "to () expects a dict argument");
+
+  char *buf = NULL;
+  size_t len = 0;
+  size_t cap = 0;
+
+  if (!_sfjson_write_value (dd, &buf, &len, &cap))
+    goto err;
+
+  if (!_sfjson_buf_push (&buf, &len, &cap, '\0'))
+    goto err;
+
+  return _sfjson_make_string (buf);
+
+err:
+  if (buf != NULL)
+    SFFREE (buf);
+  return NULL;
+}
+
 SF_API mod_t *
 sf_lib_json_makemod ()
 {
@@ -593,6 +819,23 @@ sf_lib_json_makemod ()
 
     m->slots[m->svl] = SFSTRDUP ("from");
     m->vals[m->svl] = from_o;
+    m->svl++;
+  }
+
+  {
+    fun_t *f = sf_fun_new (FUN_NATIVE);
+    sf_fun_addarg (f, "a");
+    f->v.native.nf_type = NF_ARG_1;
+    f->v.native.v.f_onearg = _sfjson_to;
+
+    obj_t *to_o = sf_objstore_req ();
+    to_o->type = OBJ_FUNC;
+    to_o->v.o_fun.v = f;
+
+    IR (to_o);
+
+    m->slots[m->svl] = SFSTRDUP ("to_str");
+    m->vals[m->svl] = to_o;
     m->svl++;
   }
 

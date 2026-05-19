@@ -7,4 +7,12 @@ d = j.from ('{
         "d": [1, 2, {"a": 20}]
     }')
 
-putln (d['d'][2]['a'])
+putln (d)
+
+e = j.to_str ({
+    'a': 12,
+    'b': 13,
+    'c': none
+})
+
+putln (e)
