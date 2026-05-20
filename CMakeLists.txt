@@ -34,5 +34,7 @@ add_library(sunflower
     dict.h dict.c
     
     sflib/sflib.h sflib/sflib.c
-    sflib/json.h sflib/json.c)
+    sflib/json.h sflib/json.c
+    sflib/sfsocket.h sflib/sfsocket.c
+    sflib/sfthread.h sflib/sfthread.c)
 

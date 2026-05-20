@@ -109,7 +109,7 @@ typedef struct _frame_s
 
 #define SF_FRAME_LOCALS_CAP (64)
 #define SF_VM_ERRLOG_SIZE (128)
-#define SF_NATIVELIB_COUNT (4)
+#define SF_NATIVELIB_COUNT (8)
 
 typedef struct
 {
@@ -118,9 +118,8 @@ typedef struct
 
 } vval_t;
 
-typedef struct _vm_s
+typedef struct _runtime_s
 {
-  size_t ip;
   instr_t *insts;
   size_t inst_len;
   size_t inst_cap;
@@ -133,8 +132,39 @@ typedef struct _vm_s
   size_t htl;
   size_t htc;
 
+  modstore_t *mod_store;
+
+  progdata_t *pg; /* program data */
+  std_t *std;     /* stack trace data */
+
+  char *sys_paths[32]; /* paths to check for imports */
+  size_t syspc;
+
   obj_t **globals; /* var name -> slot; globals[slot] = var_value */
   size_t globals_cap;
+
+  struct
+  {
+    int code;
+    const char *name;
+    obj_t *o;
+
+  } nativelib_s[SF_NATIVELIB_COUNT];
+
+#ifdef _WIN32
+
+#else
+  pthread_mutex_t globals_lock;
+#endif
+
+} runtime_t;
+
+typedef struct _vm_s
+{
+  runtime_t *rt;
+  std_t *std;
+
+  size_t ip;
 
   obj_t **stack;
   size_t stack_cap;
@@ -143,8 +173,6 @@ typedef struct _vm_s
   frame_t **frames;
   size_t fp;
   size_t frame_cap;
-
-  modstore_t *mod_store;
 
   struct
   {
@@ -162,20 +190,7 @@ typedef struct _vm_s
 
   } signals;
 
-  progdata_t *pg;              /* program data */
-  std_t *std;                  /* stack trace data */
   char err[SF_VM_ERRLOG_SIZE]; /* err message */
-
-  char *sys_paths[32]; /* paths to check for imports */
-  size_t syspc;
-
-  struct
-  {
-    int code;
-    const char *name;
-    obj_t *o;
-
-  } nativelib_s[SF_NATIVELIB_COUNT];
 
 } vm_t;
 
@@ -195,6 +210,8 @@ extern "C"
 #endif // __cplusplus
 
   SF_API vm_t sf_vm_new ();
+  SF_API vm_t sf_vm_new_nort ();
+
   SF_API void sf_vm_print_inst (instr_t);
   SF_API void sf_vm_print_b (vm_t *);
 
@@ -211,6 +228,12 @@ extern "C"
   SF_API void sqr_set (obj_t *, obj_t *, obj_t *, vm_t *);
   SF_API void sf_vm_seterr (vm_t *, const char *, ...);
   SF_API void sf_vm_addsyspath (vm_t *, char *);
+
+  SF_API void _sf_call_fun (vm_t *, obj_t *, obj_t **, size_t);
+
+  SF_API void _sf_set_globalvm (vm_t *);
+  SF_API vm_t *_sf_get_globalvm ();
+  SF_API vm_t **_sf_get_pglobalvm ();
 
 #if defined(__cplusplus)
 }

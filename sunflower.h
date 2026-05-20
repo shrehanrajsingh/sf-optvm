@@ -19,5 +19,7 @@
 #include "token.h"
 
 #include "sflib/sflib.h"
+#include "sflib/sfsocket.h"
+#include "sflib/sfthread.h"
 
 #endif // SUNFLOWER_H

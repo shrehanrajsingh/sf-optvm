@@ -35,6 +35,8 @@ sf_get_objstore ()
 SF_API void
 sf_objstore_init ()
 {
+  m1 = sf_mutex_new ();
+
   objstore = SFMALLOC (osc * sizeof (*objstore));
   osc = OBJSTORE_CAP;
   osl = 0;
@@ -337,6 +339,8 @@ sf_obj_free (obj_t *o, vm_t *vm)
       DR (o->v.o_mw.f, vm);
     }
 
+  sf_mutex_lock (&m1);
+
   if (osfil >= osfic)
     {
       osfic += OBJSTORE_CAP;
@@ -345,11 +349,17 @@ sf_obj_free (obj_t *o, vm_t *vm)
 
   o->type = -1;
   os_freeidxs[osfil++] = o->meta.index;
+
+  sf_mutex_unlock (&m1);
 }
 
 SF_API obj_t *
 sf_objstore_req_forconst (const_t *c)
 {
+  obj_t *res = NULL;
+
+  sf_mutex_lock (&m1);
+
   switch (c->type)
     {
     case CONST_INT:
@@ -359,25 +369,27 @@ sf_objstore_req_forconst (const_t *c)
 
         // D (sf_obj_print (*objstore[5]));
         if (i >= -5 && i <= 255)
-          return objstore[i + 5];
+          res = objstore[i + 5];
       }
       break;
 
     case CONST_STRING:
       {
         if (c->v.c_str.v[0] == '\0')
-          return objstore[5 + 255 + 1] /* all int constants + 1 */;
+          res = objstore[5 + 255 + 1] /* all int constants + 1 */;
       }
       break;
     case CONST_NONE:
-      return objstore[5 + 255 + 2];
+      res = objstore[5 + 255 + 2];
       break;
 
     default:
       break;
     }
 
-  return NULL;
+  sf_mutex_unlock (&m1);
+
+  return res;
 }
 
 SF_API void

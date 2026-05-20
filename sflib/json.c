@@ -3,8 +3,6 @@
 #include "../mod.h"
 #include "../object.h"
 
-#include <math.h>
-
 typedef struct
 {
   obj_t **vals;

@@ -10,6 +10,8 @@ static const_t __sf_none_obj = (const_t){ .type = CONST_NONE };
 
 void _sf_call_fun (vm_t *_VM, obj_t *_Name, obj_t **_Args, size_t _ArgCount);
 
+static vm_t *__SF_GLOBAL_VM = NULL;
+
 #define STDWRAP_BEGIN                                                         \
   {                                                                           \
     sf_std_push (vm->std, i.meta.line, i.meta.offset);
@@ -31,23 +33,31 @@ sf_vm_new ()
 {
   vm_t v;
 
-  v.globals_cap = SF_VM_GLOBALS_CAP;
-  v.globals = SFMALLOC (v.globals_cap * sizeof (*v.globals));
-  v.htc = SF_VM_HT_CAP;
-  v.htl = 0;
-  v.hts = SFMALLOC (v.htc * sizeof (*v.hts));
+  v.rt = SFMALLOC (sizeof (*v.rt));
 
-  for (size_t i = 0; i < v.htc; i++)
-    v.hts[i] = NULL;
+#ifdef _WIN32
 
-  v.hts[v.htl++] = sf_ht_new ();
-  v.inst_cap = 64;
-  v.inst_len = 0;
-  v.insts = SFMALLOC (v.inst_cap * sizeof (*v.insts));
+#else
+  pthread_mutex_init (&v.rt->globals_lock, NULL);
+#endif
+
+  v.rt->globals_cap = SF_VM_GLOBALS_CAP;
+  v.rt->globals = SFMALLOC (v.rt->globals_cap * sizeof (*v.rt->globals));
+  v.rt->htc = SF_VM_HT_CAP;
+  v.rt->htl = 0;
+  v.rt->hts = SFMALLOC (v.rt->htc * sizeof (*v.rt->hts));
+
+  for (size_t i = 0; i < v.rt->htc; i++)
+    v.rt->hts[i] = NULL;
+
+  v.rt->hts[v.rt->htl++] = sf_ht_new ();
+  v.rt->inst_cap = 64;
+  v.rt->inst_len = 0;
+  v.rt->insts = SFMALLOC (v.rt->inst_cap * sizeof (*v.rt->insts));
   v.ip = 0;
-  v.s_mc = 64;
-  v.s_ml = 0;
-  v.map_consts = SFMALLOC (v.s_mc * sizeof (*v.map_consts));
+  v.rt->s_mc = 64;
+  v.rt->s_ml = 0;
+  v.rt->map_consts = SFMALLOC (v.rt->s_mc * sizeof (*v.rt->map_consts));
   v.sp = 0;
   v.stack_cap = SF_VM_STACK_CAP;
   v.stack = SFMALLOC (v.stack_cap * sizeof (*v.stack));
@@ -58,28 +68,54 @@ sf_vm_new ()
   v.meta.g_slot = 0;
   v.meta.l_slot = 0;
   v.meta.n_slot = 0;
-  v.mod_store = sf_modstore_new ();
+  v.rt->mod_store = sf_modstore_new ();
 
-  v.pg = SFMALLOC (sizeof (*v.pg));
-  *v.pg = sf_progdata_new ();
+  v.rt->pg = SFMALLOC (sizeof (*v.rt->pg));
+  *v.rt->pg = sf_progdata_new ();
 
-  v.std = SFMALLOC (sizeof (*v.std));
-  *v.std = sf_std_new ();
+  v.rt->std = SFMALLOC (sizeof (*v.rt->std));
+  *v.rt->std = sf_std_new ();
+  v.std = v.rt->std;
 
   v.signals.continue_exec = 1;
   v.signals.errn = 0;
 
-  for (int i = 0; i < v.globals_cap; i++)
-    v.globals[i] = NULL;
+  for (int i = 0; i < v.rt->globals_cap; i++)
+    v.rt->globals[i] = NULL;
 
-  v.syspc = 0;
+  v.rt->syspc = 0;
 
   for (int i = 0; i < SF_NATIVELIB_COUNT; i++)
     {
-      v.nativelib_s[i].code = 0;
-      v.nativelib_s[i].name = NULL;
-      v.nativelib_s[i].o = NULL;
+      v.rt->nativelib_s[i].code = 0;
+      v.rt->nativelib_s[i].name = NULL;
+      v.rt->nativelib_s[i].o = NULL;
     }
+
+  return v;
+}
+
+SF_API vm_t
+sf_vm_new_nort ()
+{
+  vm_t v;
+  v.rt = NULL;
+  v.std = NULL;
+
+  v.ip = 0;
+  v.sp = 0;
+  v.stack_cap = SF_VM_STACK_CAP;
+  v.stack = SFMALLOC (v.stack_cap * sizeof (*v.stack));
+  v.fp = 0;
+  v.frame_cap = SF_VM_FRAME_CAP;
+  v.frames = SFMALLOC (v.frame_cap * sizeof (*v.frames));
+  v.meta.slot = SF_VM_SLOT_GLOBAL;
+  v.meta.g_slot = 0;
+  v.meta.l_slot = 0;
+  v.meta.n_slot = 0;
+
+  v.signals.continue_exec = 1;
+  v.signals.errn = 0;
 
   return v;
 }
@@ -87,7 +123,7 @@ sf_vm_new ()
 SF_API void
 sf_vm_addsyspath (vm_t *vm, char *s)
 {
-  vm->sys_paths[vm->syspc++] = s;
+  vm->rt->sys_paths[vm->rt->syspc++] = s;
 }
 
 SF_API void
@@ -206,10 +242,10 @@ sf_vm_print_inst (instr_t i)
 SF_API void
 sf_vm_print_b (vm_t *vm)
 {
-  for (int i = 0; i < vm->inst_len; i++)
+  for (int i = 0; i < vm->rt->inst_len; i++)
     {
-      printf ("(%d %p) ", i, &vm->insts[i]);
-      sf_vm_print_inst (vm->insts[i]);
+      printf ("(%d %p) ", i, &vm->rt->insts[i]);
+      sf_vm_print_inst (vm->rt->insts[i]);
     }
 }
 
@@ -230,7 +266,7 @@ pop (vm_t *vm)
 {
   if (!vm->sp)
     {
-      D (sf_vm_print_inst (vm->insts[vm->ip]));
+      D (sf_vm_print_inst (vm->rt->insts[vm->ip]));
       D (printf ("vm_ip: %lu\n", vm->ip));
       D (printf ("error: popping from empty stack\n"));
       exit (EXIT_FAILURE);
@@ -252,13 +288,13 @@ SF_API void
 sf_vm_exec_single_frame (vm_t *vm)
 {
   frame_t *fr = vm->frames[vm->fp - 1];
-  instr_t i = vm->insts[vm->ip];
+  instr_t i = vm->rt->insts[vm->ip];
 
-  if (vm->meta.g_slot >= vm->globals_cap)
+  if (vm->meta.g_slot >= vm->rt->globals_cap)
     {
-      vm->globals_cap += SF_VM_GLOBALS_CAP;
-      vm->globals
-          = SFREALLOC (vm->globals, vm->globals_cap * sizeof (*vm->globals));
+      vm->rt->globals_cap += SF_VM_GLOBALS_CAP;
+      vm->rt->globals = SFREALLOC (
+          vm->rt->globals, vm->rt->globals_cap * sizeof (*vm->rt->globals));
     }
 
 start:;
@@ -289,7 +325,7 @@ start:;
 
         case OP_LOAD_CONST:
           {
-            const_t d = vm->map_consts[i.a];
+            const_t d = vm->rt->map_consts[i.a];
 
             obj_t *d_obj = sf_objstore_req_forconst (&d);
 
@@ -329,14 +365,26 @@ start:;
             // D (sf_obj_print (*val));
             // D (printf ("%d\n", val->meta.ref_count));
 
-            if (vm->globals[i.a] != NULL)
+            if (vm->rt->globals[i.a] != NULL)
               {
-                // D (sf_obj_print (*vm->globals[i.a]));
-                // D (printf ("%d\n", vm->globals[i.a]->meta.ref_count));
-                DR (vm->globals[i.a], vm);
+                // D (sf_obj_print (*vm->rt->globals[i.a]));
+                // D (printf ("%d\n", vm->rt->globals[i.a]->meta.ref_count));
+                DR (vm->rt->globals[i.a], vm);
               }
-            vm->globals[i.a] = val;
+
+#ifdef _WIN32
+
+#else
+            pthread_mutex_lock (&vm->rt->globals_lock);
+#endif
+            vm->rt->globals[i.a] = val;
             /* already IR'ed */
+
+#ifdef _WIN32
+
+#else
+            pthread_mutex_unlock (&vm->rt->globals_lock);
+#endif
 
             // push (vm, val);
           }
@@ -427,7 +475,7 @@ start:;
         case OP_LOAD:
           {
             obj_t *o = NULL;
-            push (vm, o = vm->globals[i.a]);
+            push (vm, o = vm->rt->globals[i.a]);
 
             if (o != NULL)
               IR (o);
@@ -880,7 +928,7 @@ start:;
                 IR (f.n.vals[j]);
               }
 
-            cl->name = SFSTRDUP (vm->insts[i.a].c);
+            cl->name = SFSTRDUP (vm->rt->insts[i.a].c);
 
             obj_t *o = sf_objstore_req ();
             o->type = OBJ_CLASS;
@@ -1213,13 +1261,13 @@ start:;
         case OP_IMPORT:
           {
             const char *path = i.c;
-            const char *alias = vm->insts[++vm->ip].c;
+            const char *alias = vm->rt->insts[++vm->ip].c;
 
             D (printf ("[OP_IMPORT] path = '%s', alias = '%s'", path, alias));
 
-            if (sf_modstore_haskey (vm->mod_store, vm->ip))
+            if (sf_modstore_haskey (vm->rt->mod_store, vm->ip))
               {
-                obj_t *mg = sf_modstore_get (vm->mod_store, vm->ip);
+                obj_t *mg = sf_modstore_get (vm->rt->mod_store, vm->ip);
 
                 IR (mg);
                 push (vm, mg);
@@ -1241,10 +1289,10 @@ start:;
 
             do
               {
-                if (fi >= vm->syspc)
+                if (fi >= vm->rt->syspc)
                   break;
 
-                strcpy (fpth, vm->sys_paths[fi++]);
+                strcpy (fpth, vm->rt->sys_paths[fi++]);
                 strcat (fpth, path);
 
                 D (printf ("%s\n", fpth));
@@ -1263,8 +1311,8 @@ start:;
               {
                 for (size_t i = 0; i < SF_NATIVELIB_COUNT; i++)
                   {
-                    if (vm->nativelib_s[i].name != NULL
-                        && !strcmp (vm->nativelib_s[i].name, path))
+                    if (vm->rt->nativelib_s[i].name != NULL
+                        && !strcmp (vm->rt->nativelib_s[i].name, path))
                       {
                         is_nativemod = 1;
                         _nmod_idx = i;
@@ -1278,11 +1326,11 @@ start:;
 
             if (is_nativemod)
               {
-                push (vm, vm->nativelib_s[_nmod_idx].o);
-                IR (vm->nativelib_s[_nmod_idx].o);
+                push (vm, vm->rt->nativelib_s[_nmod_idx].o);
+                IR (vm->rt->nativelib_s[_nmod_idx].o);
 
-                sf_modstore_add (vm->mod_store, vm->ip,
-                                 vm->nativelib_s[_nmod_idx].o);
+                sf_modstore_add (vm->rt->mod_store, vm->ip,
+                                 vm->rt->nativelib_s[_nmod_idx].o);
               }
             else
               {
@@ -1421,22 +1469,22 @@ start:;
                   }
 
                 // approach 1
-                size_t ip = vm->inst_len;
+                size_t ip = vm->rt->inst_len;
 
                 PRESERVE (vm);
                 vm->meta.slot = SF_VM_SLOT_NAME;
 
-                hashtable_t **hts = vm->hts;
-                size_t htsp = vm->htl;
+                hashtable_t **hts = vm->rt->hts;
+                size_t htsp = vm->rt->htl;
 
-                vm->hts = SFMALLOC (vm->htc * sizeof (*vm->hts));
-                vm->htl = 0;
+                vm->rt->hts = SFMALLOC (vm->rt->htc * sizeof (*vm->rt->hts));
+                vm->rt->htl = 0;
 
-                for (size_t i = 0; i < vm->htc; i++)
-                  vm->hts[i] = NULL;
+                for (size_t i = 0; i < vm->rt->htc; i++)
+                  vm->rt->hts[i] = NULL;
 
-                vm->hts[vm->htl++] = hts[0];
-                vm->hts[vm->htl++] = sf_ht_new ();
+                vm->rt->hts[vm->rt->htl++] = hts[0];
+                vm->rt->hts[vm->rt->htl++] = sf_ht_new ();
 
                 /**
                  * this adds bytecode to the end
@@ -1448,14 +1496,14 @@ start:;
 
                 // sf_vm_print_b (vm);
 
-                for (size_t i = 1; i < vm->htc; i++)
-                  if (vm->hts[i] != NULL)
-                    sf_ht_free (vm->hts[i]);
+                for (size_t i = 1; i < vm->rt->htc; i++)
+                  if (vm->rt->hts[i] != NULL)
+                    sf_ht_free (vm->rt->hts[i]);
 
-                SFFREE (vm->hts);
+                SFFREE (vm->rt->hts);
 
-                vm->hts = hts;
-                vm->htl = htsp;
+                vm->rt->hts = hts;
+                vm->rt->htl = htsp;
 
                 // for (size_t i = ip; i < vm->inst_len; i++)
                 //   sf_vm_print_inst (vm->insts[i]);
@@ -1519,7 +1567,7 @@ start:;
                 IR (o);
 
                 IR (o);
-                sf_modstore_add (vm->mod_store, vm->ip, o);
+                sf_modstore_add (vm->rt->mod_store, vm->ip, o);
 
                 /**
                  * hide the frame and save it
@@ -1580,7 +1628,7 @@ start:;
           printf ("stack trace: \n");
           for (int j = vm->std->ll - 1; j >= 0; j--)
             {
-              char *p = vm->pg->lines[vm->std->lis[j] + vm->std->lof[j]];
+              char *p = vm->rt->pg->lines[vm->std->lis[j] + vm->std->lof[j]];
 
               while (*p && isspace (*p))
                 p++;
@@ -1591,7 +1639,7 @@ start:;
           exit (EXIT_FAILURE);
         }
 
-      i = vm->insts[++vm->ip];
+      i = vm->rt->insts[++vm->ip];
 
       STDWRAP_END
     }
@@ -1612,20 +1660,20 @@ SF_API void
 sf_vm_exec_frame_top (vm_t *vm)
 {
   frame_t *fr = vm->frames[vm->fp - 1];
-  instr_t i = vm->insts[vm->ip];
+  instr_t i = vm->rt->insts[vm->ip];
 
-  if (vm->meta.g_slot >= vm->globals_cap)
+  if (vm->meta.g_slot >= vm->rt->globals_cap)
     {
-      vm->globals_cap += SF_VM_GLOBALS_CAP;
-      vm->globals
-          = SFREALLOC (vm->globals, vm->globals_cap * sizeof (*vm->globals));
+      vm->rt->globals_cap += SF_VM_GLOBALS_CAP;
+      vm->rt->globals = SFREALLOC (
+          vm->rt->globals, vm->rt->globals_cap * sizeof (*vm->rt->globals));
     }
 
 start:;
   sf_vm_exec_single_frame (vm);
 
 end:;
-  i = vm->insts[vm->ip];
+  i = vm->rt->insts[vm->ip];
 
   // while (vm->sp > fr->stack_base)
   //   {
@@ -1657,39 +1705,51 @@ end:;
     {
       sf_vm_popframe (vm);
 
-      for (size_t i = 0; i < vm->globals_cap; i++)
+#ifdef _WIN32
+
+#else
+      pthread_mutex_lock (&vm->rt->globals_lock);
+#endif
+
+      for (size_t i = 0; i < vm->rt->globals_cap; i++)
         {
-          if (vm->globals[i] != NULL)
+          if (vm->rt->globals[i] != NULL)
             {
-              if (vm->globals[i]->type == OBJ_CLASS)
+              if (vm->rt->globals[i]->type == OBJ_CLASS)
                 {
                   continue;
                 }
 
-              if (vm->globals[i]->type == OBJ_COBJ)
+              if (vm->rt->globals[i]->type == OBJ_COBJ)
                 {
-                  cobj_t *c = vm->globals[i]->v.o_cobj.v;
+                  cobj_t *c = vm->rt->globals[i]->v.o_cobj.v;
 
                   // D (printf ("%d\n", c->p->svl));
 
                   // for (int i = 0; i < c->p->svl; i++)
                   //   D (printf ("%s\n", c->p->slots[i]));
-                  DR (vm->globals[i], vm);
-                  vm->globals[i] = NULL;
+                  DR (vm->rt->globals[i], vm);
+                  vm->rt->globals[i] = NULL;
                 }
             }
         }
 
-      for (size_t i = 0; i < vm->globals_cap; i++)
+      for (size_t i = 0; i < vm->rt->globals_cap; i++)
         {
-          if (vm->globals[i] != NULL)
+          if (vm->rt->globals[i] != NULL)
             {
-              DR (vm->globals[i], vm);
+              DR (vm->rt->globals[i], vm);
             }
         }
 
-      SFFREE (vm->globals);
-      vm->globals_cap = 0;
+      SFFREE (vm->rt->globals);
+      vm->rt->globals_cap = 0;
+
+#ifdef _WIN32
+
+#else
+      pthread_mutex_unlock (&vm->rt->globals_lock);
+#endif
     }
   else if (vm->fp > 1)
     {
@@ -2158,10 +2218,10 @@ sqr_set (obj_t *p, obj_t *i, obj_t *val, vm_t *vm)
 end3:;
 }
 
-void
+SF_API void
 _sf_call_fun (vm_t *vm, obj_t *name, obj_t **args, size_t argc)
 {
-  instr_t inst = vm->insts[vm->ip];
+  instr_t inst = vm->rt->insts[vm->ip];
 
   switch (name->type)
     {
@@ -2459,6 +2519,24 @@ sf_vm_seterr (vm_t *vm, const char *s, ...)
   vsnprintf (vm->err, sizeof (vm->err), s, args);
 
   va_end (args);
+}
+
+SF_API void
+_sf_set_globalvm (vm_t *vm)
+{
+  __SF_GLOBAL_VM = vm;
+}
+
+SF_API vm_t *
+_sf_get_globalvm ()
+{
+  return __SF_GLOBAL_VM;
+}
+
+SF_API vm_t **
+_sf_get_pglobalvm ()
+{
+  return &__SF_GLOBAL_VM;
 }
 
 /*

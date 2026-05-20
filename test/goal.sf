@@ -154,3 +154,35 @@ for i, j in [[1, 2], [3, 4], [5, 6]]
 
 a = 1 to 10
 putln (a)
+
+import 'json' as j
+
+d = j.from ('{
+        "a": 10, 
+        "b": 20, 
+        "c": true,
+        "d": [1, 2, {"a": 20}]
+    }')
+
+putln (d)
+
+e = j.to_str ({
+    'a': 12,
+    'b': 13,
+    'c': none
+})
+
+putln (e)
+
+import 'thread' as t
+
+fun test (a)
+    for i in 1 to 1000
+        b = 0
+    putln (a)
+
+s = t.thread (test, 10)
+p = t.thread (test, 20)
+
+t.detach (s)
+t.join (p)

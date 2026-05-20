@@ -16,6 +16,7 @@ SF_API void
 sf_std_free (std_t *s)
 {
   SFFREE (s->lis);
+  SFFREE (s->lof);
 }
 
 SF_API void

@@ -16,6 +16,17 @@ sf_native_put (obj_t *v)
   return NULL;
 }
 
+/* sleep (s) */
+SF_API obj_t *
+sf_native_sleep (obj_t *v)
+{
+  assert (v && OBJ_IS_INT (v) && "argument must be an integer");
+
+  sleep (v->v.o_const.v.v.c_int.v);
+
+  return NULL;
+}
+
 SF_API obj_t *
 sf_native_write (obj_t **vals, size_t vl)
 {
@@ -77,6 +88,12 @@ sf_native_write (obj_t **vals, size_t vl)
 SF_API void
 sf_natives_add_tovm (vm_t *vm)
 {
+#ifdef _WIN32
+
+#else
+  pthread_mutex_lock (&vm->rt->globals_lock);
+#endif
+
   {
     fun_t *f = sf_fun_new (FUN_NATIVE);
     sf_fun_addarg (f, "a");
@@ -93,8 +110,8 @@ sf_natives_add_tovm (vm_t *vm)
     vval_t *s = SFMALLOC (sizeof (*s));
     s->pos = vm->meta.g_slot;
     s->slot = SF_VM_SLOT_GLOBAL;
-    sf_ht_insert (vm->hts[vm->htl - 1], "putln", (void *)s);
-    vm->globals[vm->meta.g_slot++] = putln_o;
+    sf_ht_insert (vm->rt->hts[vm->rt->htl - 1], "putln", (void *)s);
+    vm->rt->globals[vm->meta.g_slot++] = putln_o;
   }
 
   {
@@ -113,8 +130,8 @@ sf_natives_add_tovm (vm_t *vm)
     vval_t *s = SFMALLOC (sizeof (*s));
     s->pos = vm->meta.g_slot;
     s->slot = SF_VM_SLOT_GLOBAL;
-    sf_ht_insert (vm->hts[vm->htl - 1], "put", (void *)s);
-    vm->globals[vm->meta.g_slot++] = put_o;
+    sf_ht_insert (vm->rt->hts[vm->rt->htl - 1], "put", (void *)s);
+    vm->rt->globals[vm->meta.g_slot++] = put_o;
   }
 
   {
@@ -133,7 +150,32 @@ sf_natives_add_tovm (vm_t *vm)
     vval_t *s = SFMALLOC (sizeof (*s));
     s->pos = vm->meta.g_slot;
     s->slot = SF_VM_SLOT_GLOBAL;
-    sf_ht_insert (vm->hts[vm->htl - 1], "write", (void *)s);
-    vm->globals[vm->meta.g_slot++] = write_o;
+    sf_ht_insert (vm->rt->hts[vm->rt->htl - 1], "write", (void *)s);
+    vm->rt->globals[vm->meta.g_slot++] = write_o;
   }
+
+  {
+    fun_t *f = sf_fun_new (FUN_NATIVE);
+    sf_fun_addarg (f, "a");
+    f->v.native.nf_type = NF_ARG_1;
+    f->v.native.v.f_onearg = sf_native_sleep;
+
+    obj_t *sleep_o = sf_objstore_req ();
+    sleep_o->type = OBJ_FUNC;
+    sleep_o->v.o_fun.v = f;
+
+    IR (sleep_o);
+
+    vval_t *s = SFMALLOC (sizeof (*s));
+    s->pos = vm->meta.g_slot;
+    s->slot = SF_VM_SLOT_GLOBAL;
+    sf_ht_insert (vm->rt->hts[vm->rt->htl - 1], "sleep", (void *)s);
+    vm->rt->globals[vm->meta.g_slot++] = sleep_o;
+  }
+
+#ifdef _WIN32
+
+#else
+  pthread_mutex_unlock (&vm->rt->globals_lock);
+#endif
 }

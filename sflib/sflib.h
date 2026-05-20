@@ -5,6 +5,8 @@
 #include "../malloc.h"
 
 #include "json.h"
+#include "sfsocket.h"
+#include "sfthread.h"
 
 struct _vm_s;
 

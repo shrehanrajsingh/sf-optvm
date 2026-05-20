@@ -51,36 +51,38 @@ _obj_tobool (obj_t *o)
 void
 add_inst (vm_t *vm, instr_t i)
 {
-  if (vm->inst_len >= vm->inst_cap)
+  if (vm->rt->inst_len >= vm->rt->inst_cap)
     {
-      vm->inst_cap += 64;
-      vm->insts = SFREALLOC (vm->insts, vm->inst_cap * sizeof (*vm->insts));
+      vm->rt->inst_cap += 64;
+      vm->rt->insts = SFREALLOC (vm->rt->insts,
+                                 vm->rt->inst_cap * sizeof (*vm->rt->insts));
     }
 
-  vm->insts[vm->inst_len++] = i;
+  vm->rt->insts[vm->rt->inst_len++] = i;
 }
 
 hashtable_t *
 push_ht (vm_t *vm)
 {
-  if (vm->htl >= vm->htc)
+  if (vm->rt->htl >= vm->rt->htc)
     {
-      vm->htc += SF_VM_HT_CAP;
-      vm->hts = SFREALLOC (vm->hts, vm->htc * sizeof (*vm->hts));
+      vm->rt->htc += SF_VM_HT_CAP;
+      vm->rt->hts
+          = SFREALLOC (vm->rt->hts, vm->rt->htc * sizeof (*vm->rt->hts));
     }
 
-  vm->hts[vm->htl] = sf_ht_new ();
-  return vm->hts[vm->htl++];
+  vm->rt->hts[vm->rt->htl] = sf_ht_new ();
+  return vm->rt->hts[vm->rt->htl++];
 }
 
 void
 pop_ht (vm_t *vm)
 {
-  if (!vm->htl)
+  if (!vm->rt->htl)
     return;
 
-  sf_ht_free (vm->hts[--vm->htl]);
-  vm->hts[vm->htl] = NULL;
+  sf_ht_free (vm->rt->hts[--vm->rt->htl]);
+  vm->rt->hts[vm->rt->htl] = NULL;
 }
 
 int
@@ -122,8 +124,8 @@ static vval_t *
 get_var (vm_t *vm, const char *name, int *level_ptr)
 {
   int gt = 0;
-  vval_t *v = sf_ht_get (vm->hts[vm->htl - 1], name, &gt);
-  int l = vm->htl - 1;
+  vval_t *v = sf_ht_get (vm->rt->hts[vm->rt->htl - 1], name, &gt);
+  int l = vm->rt->htl - 1;
   int level = 0;
 
   while (!gt)
@@ -131,7 +133,7 @@ get_var (vm_t *vm, const char *name, int *level_ptr)
       if (l < 1)
         break;
 
-      v = sf_ht_get (vm->hts[--l], name, &gt);
+      v = sf_ht_get (vm->rt->hts[--l], name, &gt);
       level++;
     }
 
@@ -145,7 +147,7 @@ static vval_t *
 get_var_look_top (vm_t *vm, const char *name)
 {
   int gt = 0;
-  vval_t *v = sf_ht_get (vm->hts[vm->htl - 1], name, &gt);
+  vval_t *v = sf_ht_get (vm->rt->hts[vm->rt->htl - 1], name, &gt);
 
   if (!gt)
     return NULL;
@@ -179,7 +181,7 @@ add_var (vm_t *vm, const char *name)
       v->pos = vm->meta.n_slot++;
     }
 
-  sf_ht_insert (vm->hts[vm->htl - 1], name, (void *)v);
+  sf_ht_insert (vm->rt->hts[vm->rt->htl - 1], name, (void *)v);
   return v;
 }
 
@@ -252,9 +254,9 @@ sf_vm_gen_b_fromexpr (vm_t *vm, expr_t e)
         int found = 0;
         const_t d = e.v.e_const.v;
 
-        for (int i = 0; i < vm->s_ml; i++)
+        for (int i = 0; i < vm->rt->s_ml; i++)
           {
-            if (const_eqeq (vm->map_consts[i], d))
+            if (const_eqeq (vm->rt->map_consts[i], d))
               {
                 found = 1;
                 j = i;
@@ -274,17 +276,18 @@ sf_vm_gen_b_fromexpr (vm_t *vm, expr_t e)
           }
         else
           {
-            if (vm->s_ml >= vm->s_mc)
+            if (vm->rt->s_ml >= vm->rt->s_mc)
               {
-                vm->s_mc += 64;
-                vm->map_consts = SFREALLOC (
-                    vm->map_consts, vm->s_mc * sizeof (*vm->map_consts));
+                vm->rt->s_mc += 64;
+                vm->rt->map_consts
+                    = SFREALLOC (vm->rt->map_consts,
+                                 vm->rt->s_mc * sizeof (*vm->rt->map_consts));
               }
 
-            vm->map_consts[vm->s_ml++] = sf_const_copy (d);
+            vm->rt->map_consts[vm->rt->s_ml++] = sf_const_copy (d);
 
             add_inst (vm, (instr_t){ .op = OP_LOAD_CONST,
-                                     .a = vm->s_ml - 1,
+                                     .a = vm->rt->s_ml - 1,
                                      .b = 0,
                                      .meta = {
                                          .line = e.line,
@@ -672,14 +675,14 @@ sf_vm_gen_bytecode (vm_t *vm, StmtSM *smt)
                                          .offset = 0,
                                      } });
 
-            size_t pl = vm->inst_len - 1;
+            size_t pl = vm->rt->inst_len - 1;
 
             StmtSM smt;
             smt.vals = body;
             smt.vl = smt.vc = bl;
 
             sf_vm_gen_bytecode (vm, &smt);
-            vm->inst_len--; // eat return
+            vm->rt->inst_len--; // eat return
 
             add_inst (vm, (instr_t){ .op = OP_JUMP,
                                      .a = 0,
@@ -689,10 +692,10 @@ sf_vm_gen_bytecode (vm_t *vm, StmtSM *smt)
                                          .offset = 0,
                                      } });
 
-            size_t ql = vm->inst_len - 1;
-            vm->insts[pl] = (instr_t){
+            size_t ql = vm->rt->inst_len - 1;
+            vm->rt->insts[pl] = (instr_t){
               .op = OP_JUMP_IF_FALSE,
-              .a = vm->inst_len,
+              .a = vm->rt->inst_len,
               .b = 0,
             };
 
@@ -702,12 +705,12 @@ sf_vm_gen_bytecode (vm_t *vm, StmtSM *smt)
                 smt.vl = smt.vc = ebl;
 
                 sf_vm_gen_bytecode (vm, &smt);
-                vm->inst_len--; // eat return
+                vm->rt->inst_len--; // eat return
               }
 
-            vm->insts[ql] = (instr_t){
+            vm->rt->insts[ql] = (instr_t){
               .op = OP_JUMP,
-              .a = vm->inst_len,
+              .a = vm->rt->inst_len,
               .b = 0,
             };
           }
@@ -719,7 +722,7 @@ sf_vm_gen_bytecode (vm_t *vm, StmtSM *smt)
             stmt_t *body = s->v.s_while.body;
             expr_t *cond = s->v.s_while.cond;
 
-            size_t vl = vm->inst_len;
+            size_t vl = vm->rt->inst_len;
 
             // write condition to check
             cond->line = s->line;
@@ -734,7 +737,7 @@ sf_vm_gen_bytecode (vm_t *vm, StmtSM *smt)
                                          .offset = 0,
                                      } });
 
-            size_t il = vm->inst_len - 1;
+            size_t il = vm->rt->inst_len - 1;
             /**
              * ! DO NOT TAKE REFERENCE OF LAST INSTRUCTION
              * ! IF vm->insts IS REALLOCED THEN REFERENCES BECOME
@@ -752,7 +755,7 @@ sf_vm_gen_bytecode (vm_t *vm, StmtSM *smt)
 
             sf_vm_gen_bytecode (vm, &smt);
 
-            vm->inst_len--; // eat return
+            vm->rt->inst_len--; // eat return
 
             // D (printf ("%d\n", vl));
             add_inst (vm, (instr_t){ .op = OP_JUMP,
@@ -764,9 +767,9 @@ sf_vm_gen_bytecode (vm_t *vm, StmtSM *smt)
                                      } });
 
             // D (printf ("%d\n", vm->inst_len));
-            vm->insts[il] = (instr_t){
+            vm->rt->insts[il] = (instr_t){
               .op = OP_JUMP_IF_FALSE,
-              .a = vm->inst_len,
+              .a = vm->rt->inst_len,
               .b = 0,
             };
             // D (printf ("%d %d\n", p->a, p->op));
@@ -824,8 +827,8 @@ sf_vm_gen_bytecode (vm_t *vm, StmtSM *smt)
                                          .offset = 0,
                                      } });
 
-            size_t pl = vm->inst_len - 1;
-            size_t ql = vm->inst_len;
+            size_t pl = vm->rt->inst_len - 1;
+            size_t ql = vm->rt->inst_len;
 
             for (size_t i = 0; i < vltc; i++)
               {
@@ -843,9 +846,9 @@ sf_vm_gen_bytecode (vm_t *vm, StmtSM *smt)
 
             pop_ht (vm);
 
-            vm->insts[pl] = (instr_t){
+            vm->rt->insts[pl] = (instr_t){
               .op = OP_JUMP,
-              .a = vm->inst_len,
+              .a = vm->rt->inst_len,
               .b = 0,
             };
 
@@ -926,7 +929,7 @@ sf_vm_gen_bytecode (vm_t *vm, StmtSM *smt)
                                      .offset = 0,
                                  } });
 
-            size_t il = vm->inst_len - 1;
+            size_t il = vm->rt->inst_len - 1;
 
             StmtSM csm;
             csm.vals = body;
@@ -940,7 +943,7 @@ sf_vm_gen_bytecode (vm_t *vm, StmtSM *smt)
             vm->meta.slot = SF_VM_SLOT_NAME;
 
             sf_vm_gen_bytecode (vm, &csm);
-            vm->inst_len--;
+            vm->rt->inst_len--;
 
             pop_ht (vm);
 
@@ -955,9 +958,9 @@ sf_vm_gen_bytecode (vm_t *vm, StmtSM *smt)
                                    .offset = 0,
                                } });
 
-            vm->insts[il] = (instr_t){
+            vm->rt->insts[il] = (instr_t){
               .op = OP_LOAD_BUILDCLASS,
-              .a = vm->inst_len - 1, /* the corresponding LOAD_BUILDEND */
+              .a = vm->rt->inst_len - 1, /* the corresponding LOAD_BUILDEND */
               .b = 0,
               .c = (char *)name,
             };
@@ -1006,7 +1009,7 @@ sf_vm_gen_bytecode (vm_t *vm, StmtSM *smt)
                                          .offset = 0,
                                      } });
 
-            size_t jl = vm->inst_len;
+            size_t jl = vm->rt->inst_len;
 
             add_inst (
                 vm,
@@ -1022,7 +1025,7 @@ sf_vm_gen_bytecode (vm_t *vm, StmtSM *smt)
                         .offset = 0,
                     } });
 
-            size_t il = vm->inst_len;
+            size_t il = vm->rt->inst_len;
 
             for (size_t p = 0; p < s->v.s_for.vl; p++)
               {
@@ -1068,7 +1071,7 @@ sf_vm_gen_bytecode (vm_t *vm, StmtSM *smt)
 
             sf_vm_gen_bytecode (vm, &smt);
 
-            vm->inst_len--; // eat return
+            vm->rt->inst_len--; // eat return
 
             // D (printf ("%d\n", vl));
             add_inst (vm, (instr_t){ .op = OP_JUMP,
@@ -1081,7 +1084,7 @@ sf_vm_gen_bytecode (vm_t *vm, StmtSM *smt)
 
             // D (printf ("%d\n", vm->inst_len));
 
-            vm->insts[jl].a = vm->inst_len;
+            vm->rt->insts[jl].a = vm->rt->inst_len;
           }
           break;
 
@@ -1145,16 +1148,17 @@ sf_vm_gen_bytecode (vm_t *vm, StmtSM *smt)
 
 end:;
 
-  add_inst (
-      vm, (instr_t){ .op = OP_RETURN,
-                     .a = 0, /* 0 means the user hasnt written a return
-                                anywhere, but the routine has to end somehow */
-                     .b = 0,
-                     .meta = {
-                         .line = s != NULL ? s->line
-                                 : vm->inst_len
-                                     ? vm->insts[vm->inst_len - 1].meta.line
-                                     : 0,
-                         .offset = 0,
-                     } });
+  add_inst (vm,
+            (instr_t){
+                .op = OP_RETURN,
+                .a = 0, /* 0 means the user hasnt written a return
+                           anywhere, but the routine has to end somehow */
+                .b = 0,
+                .meta = {
+                    .line = s != NULL ? s->line
+                            : vm->rt->inst_len
+                                ? vm->rt->insts[vm->rt->inst_len - 1].meta.line
+                                : 0,
+                    .offset = 0,
+                } });
 }

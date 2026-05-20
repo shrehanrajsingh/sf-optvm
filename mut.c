@@ -4,6 +4,11 @@ SF_API sfmutex_t
 sf_mutex_new ()
 {
   sfmutex_t m;
+#if defined(_WIN32)
+  m.mut = CreateMutex (NULL, 0, NULL);
+#else
+  pthread_mutex_init (&m.mut, NULL);
+#endif // _WIN32
   return m;
 }
 

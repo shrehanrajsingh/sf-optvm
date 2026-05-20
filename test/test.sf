@@ -1,18 +1,12 @@
-import 'json' as j
+import 'thread' as t
 
-d = j.from ('{
-        "a": 10, 
-        "b": 20, 
-        "c": true,
-        "d": [1, 2, {"a": 20}]
-    }')
+fun test (a)
+    for i in 1 to 1000
+        b = 0
+    putln (a)
 
-putln (d)
+s = t.thread (test, 10)
+p = t.thread (test, 20)
 
-e = j.to_str ({
-    'a': 12,
-    'b': 13,
-    'c': none
-})
-
-putln (e)
+t.detach (s)
+t.join (p)

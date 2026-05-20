@@ -5,6 +5,7 @@
 #include <ctype.h>
 #include <errno.h>
 #include <limits.h>
+#include <math.h>
 #include <stdarg.h>
 #include <stdatomic.h>
 #include <stddef.h>
@@ -16,7 +17,11 @@
 #if defined(_WIN32)
 #include <windows.h>
 #else
+#include <netinet/in.h>
 #include <pthread.h>
+#include <sys/socket.h>
+#include <sys/types.h>
+#include <unistd.h>
 #endif // _WIN32
 
 #define SF_API

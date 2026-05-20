@@ -86,7 +86,7 @@ test3 ()
       lines[ll++] = buf + lo;
     }
 
-  *vm.pg = sf_progdata_new_withLines (lines, ll);
+  *vm.rt->pg = sf_progdata_new_withLines (lines, ll);
 
   sf_natives_add_tovm (&vm);
 
@@ -95,9 +95,11 @@ test3 ()
   sf_vm_print_b (&vm);
   vm.fp = 0;
 
+  _sf_set_globalvm (&vm);
+
   frame_t top = sf_frame_new_local ();
   top.pop_ret_val = 0;
-  top.return_ip = vm.inst_len - 1;
+  top.return_ip = vm.rt->inst_len - 1;
   top.stack_base = vm.sp;
   sf_vm_addframe (&vm, top);
 
@@ -112,13 +114,42 @@ test3 ()
     obj_t *o_ljson = sf_objstore_req ();
     o_ljson->type = OBJ_MOD;
     o_ljson->v.o_mod.v = sf_lib_json_makemod ();
+    o_ljson->v.o_mod.v->name = SFSTRDUP ("json");
 
     IR (o_ljson);
-    sf_modstore_add (vm.mod_store, -1, o_ljson);
+    sf_modstore_add (vm.rt->mod_store, -1, o_ljson);
 
-    vm.nativelib_s[0].code = -1;
-    vm.nativelib_s[0].o = o_ljson;
-    vm.nativelib_s[0].name = "json";
+    vm.rt->nativelib_s[0].code = -1;
+    vm.rt->nativelib_s[0].o = o_ljson;
+    vm.rt->nativelib_s[0].name = "json";
+  }
+
+  {
+    obj_t *o_lsocket = sf_objstore_req ();
+    o_lsocket->type = OBJ_MOD;
+    o_lsocket->v.o_mod.v = sf_lib_socket_makemod ();
+    o_lsocket->v.o_mod.v->name = SFSTRDUP ("socket");
+
+    IR (o_lsocket);
+    sf_modstore_add (vm.rt->mod_store, -2, o_lsocket);
+
+    vm.rt->nativelib_s[1].code = -2;
+    vm.rt->nativelib_s[1].o = o_lsocket;
+    vm.rt->nativelib_s[1].name = "socket";
+  }
+
+  {
+    obj_t *o_lthread = sf_objstore_req ();
+    o_lthread->type = OBJ_MOD;
+    o_lthread->v.o_mod.v = sf_lib_thread_makemod ();
+    o_lthread->v.o_mod.v->name = SFSTRDUP ("thread");
+
+    IR (o_lthread);
+    sf_modstore_add (vm.rt->mod_store, -3, o_lthread);
+
+    vm.rt->nativelib_s[2].code = -3;
+    vm.rt->nativelib_s[2].o = o_lthread;
+    vm.rt->nativelib_s[2].name = "thread";
   }
 
   do
