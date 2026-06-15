@@ -47,5 +47,41 @@ sf_lib_socket_makemod ()
     m->vals[m->svl++] = o_SOCK_STREAM;
   }
 
+  {
+    /* Socket class */
+    class_t *cl_n = sf_class_new ();
+    cl_n->name = SFSTRDUP ("Socket");
+
+    cl_n->svc = 8;
+    cl_n->slots = SFMALLOC (cl_n->svc * sizeof (*cl_n->slots));
+    cl_n->vals = SFMALLOC (cl_n->svc * sizeof (*cl_n->vals));
+
+    {
+      /* port variable */
+      cl_n->slots[cl_n->svl] = SFSTRDUP ("port");
+
+      const_t i0 = (const_t){
+        .type = CONST_INT,
+        .v.c_int.v = 0,
+      };
+
+      cl_n->vals[cl_n->svl] = sf_objstore_req_forconst (&i0);
+
+      cl_n->svl++;
+    }
+
+    obj_t *cl_o = sf_objstore_req ();
+    cl_o->type = OBJ_CLASS;
+    cl_o->v.o_class.v = cl_n;
+
+    IR (cl_o);
+    m->fr->n.names[m->fr->n.nvl] = SFSTRDUP ("Socket");
+    m->fr->n.vals[m->fr->n.nvl++] = cl_o;
+
+    IR (cl_o);
+    m->slots[m->svl] = SFSTRDUP ("Socket");
+    m->vals[m->svl++] = cl_o;
+  }
+
   return m;
 }

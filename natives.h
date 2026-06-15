@@ -15,6 +15,7 @@ extern "C"
   SF_API obj_t *sf_native_putln (obj_t *);
   SF_API obj_t *sf_native_put (obj_t *);
   SF_API obj_t *sf_native_write (obj_t **, size_t);
+  SF_API obj_t *sf_native_exit (obj_t *);
 
 #if defined(__cplusplus)
 }

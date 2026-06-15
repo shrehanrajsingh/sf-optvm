@@ -85,6 +85,17 @@ sf_native_write (obj_t **vals, size_t vl)
   return NULL;
 }
 
+SF_API obj_t *
+sf_native_exit (obj_t *o)
+{
+  assert (o && OBJ_IS_INT (o));
+
+  int v = o->v.o_const.v.v.c_int.v;
+  exit (v);
+
+  return NULL;
+}
+
 SF_API void
 sf_natives_add_tovm (vm_t *vm)
 {
@@ -171,6 +182,25 @@ sf_natives_add_tovm (vm_t *vm)
     s->slot = SF_VM_SLOT_GLOBAL;
     sf_ht_insert (vm->rt->hts[vm->rt->htl - 1], "sleep", (void *)s);
     vm->rt->globals[vm->meta.g_slot++] = sleep_o;
+  }
+
+  {
+    fun_t *f = sf_fun_new (FUN_NATIVE);
+    sf_fun_addarg (f, "a");
+    f->v.native.nf_type = NF_ARG_1;
+    f->v.native.v.f_onearg = sf_native_exit;
+
+    obj_t *exit_o = sf_objstore_req ();
+    exit_o->type = OBJ_FUNC;
+    exit_o->v.o_fun.v = f;
+
+    IR (exit_o);
+
+    vval_t *s = SFMALLOC (sizeof (*s));
+    s->pos = vm->meta.g_slot;
+    s->slot = SF_VM_SLOT_GLOBAL;
+    sf_ht_insert (vm->rt->hts[vm->rt->htl - 1], "exit", (void *)s);
+    vm->rt->globals[vm->meta.g_slot++] = exit_o;
   }
 
 #ifdef _WIN32
